@@ -33,18 +33,18 @@ public class Client {
   			System.out.println("Connecting...");
 
   			// receive file
-  			byte [] mybytearray  = new byte [FILE_SIZE];
   			fr = new FileReceiver(receiveFile, sock);
-  			InputStream is = sock.getInputStream();
-  			bytesRead = is.read(mybytearray,0,mybytearray.length);
-  			current = bytesRead;
-		
+  			boolean receivedPacket = false;
   			int i = 0;
-  			while (receiveNextPacket(fr)){
-  				System.out.println("receiving shit");
-  				i+=packetSize;
-  			}
-  			System.out.println("File " + receiveFile + " downloaded (" + current + " bytes read)");
+  			do {
+  				receivedPacket = receiveNextPacket(fr);
+  				if (receivedPacket){
+  					System.out.println("received shit packet " + i);
+  					i++;
+  				}
+  			} while(receivedPacket);
+  			
+  			System.out.println("File " + receiveFile + " downloaded (" + i * packetSize + " bytes read)");
   		}
   		finally {
   			if (fr.getFos() != null) fr.getFos().close();
@@ -86,15 +86,17 @@ public class Client {
   	    }
   	}
   	
+  	//returns true if there was a packet to receive
   	private boolean receiveNextPacket(FileReceiver fr) throws IOException{
   		byte [] packet  = new byte [packetSize];
   		int bytesRead;
   		boolean packetReceived = false;
   		
-  		while ((bytesRead = fr.getIs().read(packet)) > 0){
+  		if ((bytesRead = fr.getIs().read(packet)) > 0){
   			fr.getBos().write(packet, 0, bytesRead);
   			packetReceived = true;
   		}
+  		
   		
 		fr.getBos().flush();
 		return packetReceived;
