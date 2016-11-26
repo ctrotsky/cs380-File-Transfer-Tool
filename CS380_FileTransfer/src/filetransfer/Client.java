@@ -15,9 +15,8 @@ public class Client {
 	private int socketPort = 13267;      // you may change this
 	private String targetIP = "127.0.0.1";  // localhost
 	private String receiveFile = "E:/Documents/SocketTesting/FileClient1/ReceiveFile.txt";
-	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";// you may change this, I give a
-	                                                            // different name because i don't want to
-	                                                            // overwrite the one used by server...
+	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";
+	private String keyFile = "";
 
   	public final static int FILE_SIZE = 6022386; // file size temporary hard coded
                                                // should bigger than the file to be downloaded
@@ -59,11 +58,9 @@ public class Client {
   	}
   	
   	public void sendFile() throws IOException{
-  		FileInputStream fis = null;
-  	    BufferedInputStream bis = null;
-  	    OutputStream os = null;
   	    ServerSocket servsock = null;
   	    Socket sock = null;
+  	    FileSender fs = null;
   	    try {
   	    	servsock = new ServerSocket(socketPort);
   	    	while (true) {
@@ -72,20 +69,18 @@ public class Client {
   	    			sock = servsock.accept();
   	    			System.out.println("Accepted connection : " + sock);
   	    			// send file
+  	    			fs = new FileSender(new File (sendFile), sock);
   	    			File myFile = new File (sendFile);
   	    			byte [] mybytearray  = new byte [(int)myFile.length()];
-  	    			fis = new FileInputStream(myFile);
-  	    			bis = new BufferedInputStream(fis);
-  	    			bis.read(mybytearray,0,mybytearray.length);
-  	    			os = sock.getOutputStream();
+  	    			fs.getBis().read(mybytearray,0,mybytearray.length);
   	    			System.out.println("Sending " + sendFile + "(" + mybytearray.length + " bytes)");
-  	    			os.write(mybytearray,0,mybytearray.length);
-  	    			os.flush();
+  	    			fs.getOs().write(mybytearray,0,mybytearray.length);
+  	    			fs.getOs().flush();
   	    			System.out.println("Done.");
   	    		}
   	    		finally {
-  	    			if (bis != null) bis.close();
-  	    			if (os != null) os.close();
+  	    			if (fs.getBis() != null) fs.getBis().close();
+  	    			if (fs.getOs() != null) fs.getOs().close();
   	    			if (sock!=null) sock.close();
   	    		}
   	    	}
@@ -93,6 +88,10 @@ public class Client {
   	    finally {
   	    	if (servsock != null) servsock.close();
   	    }
+  	}
+  	
+  	private void sendPacket(FileSender fs, int index){
+  		
   	}
   	
   	public void setSendFile(String filePath){
@@ -109,6 +108,10 @@ public class Client {
   	
   	public void setSocketPort(int port){
   		socketPort = port;
+  	}
+  	
+  	public void setKeyFile(String filePath){
+  		keyFile = filePath;
   	}
   	
 //  	public Socket establishConnection() throws IOException {
