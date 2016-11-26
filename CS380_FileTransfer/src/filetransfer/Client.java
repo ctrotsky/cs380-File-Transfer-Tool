@@ -44,7 +44,15 @@ public class Client {
   				if (receivedPacket != null){
   					System.out.println("received shit packet " + i);
   					i++;
-  					//check integrity here
+  					byte[] hash = receiveNextHash(fr);
+  					if (checkIntegrity(receivedPacket, hash)){
+  						//Valid packet. carry on.
+  						System.out.println("Packet has integrity");
+  					}
+  					else{
+  						//Invalid packet
+  						System.out.println("Packet is goofed");
+  					}
   					//use mark if correct. use reset if incorrect. Reset will move back to last mark. Try for number of retries.
   				}
   				else {
@@ -81,7 +89,7 @@ public class Client {
   	    			for (int i = 0; i < numPackets; i++){
   	    				System.out.println("sending fucking packet " + i);
   	    				byte[] packet = sendNextPacket(fs);
-  	    				//sendHashedPacket(fs, packet);
+  	    				sendHashedPacket(fs, packet);
   	    			}			
   	    		}
   	    		finally {
@@ -116,6 +124,15 @@ public class Client {
 		}
   	}
   	
+  //returns received hash
+  	private byte[] receiveNextHash(FileReceiver fr) throws IOException{
+  		byte [] hash  = new byte [4];
+  		
+  		fr.getIs().read(hash);
+  		
+  		return (hash);
+  	}
+  	
   	//returns packet so it can be used to sendHashedPacket in sendFile.
   	private byte[] sendNextPacket(FileSender fs) throws IOException{
   		byte [] packet  = new byte [packetSize];
@@ -142,6 +159,14 @@ public class Client {
   		}
   		
   		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();		
+  	}
+  	
+  	private boolean checkIntegrity(byte[] packet, byte[] receivedHash){
+  		byte[] hash = hashPacketBytes(packet);
+  		if (hash.equals(receivedHash)){
+  			return true;
+  		}
+  		return false;
   	}
   	
   	public void setSendFile(String filePath){
