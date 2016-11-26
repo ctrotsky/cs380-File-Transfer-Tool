@@ -218,6 +218,6 @@ public class Client {
   	//6. Authenticate with username and password
   	//7. Terminate connection if connection lost.
   	//8. Improve integrity hashing algorithm?
-  	
+  	//9. Last sent packet should cut off after last used byte. Currently will send with empty bytes if full packet size isn't used.
   	
 }
