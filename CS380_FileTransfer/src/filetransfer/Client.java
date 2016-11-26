@@ -40,9 +40,8 @@ public class Client {
   			current = bytesRead;
 		
   			int i = 0;
-  			while (receivePacket(fr, i)){
+  			while (receiveNextPacket(fr)){
   				System.out.println("receiving shit");
-  				receivePacket(fr, i);
   				i+=packetSize;
   			}
   			System.out.println("File " + receiveFile + " downloaded (" + current + " bytes read)");
@@ -67,12 +66,12 @@ public class Client {
   	    			System.out.println("Accepted connection : " + sock);
   	    			// send file
   	    			fs = new FileSender(sendFile, sock);
-  	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize);
+  	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
   	    			System.out.println("file size: " + fs.getFile().length());
   	    			System.out.println("number of fucking packets: " + numPackets);
   	    			for (int i = 0; i < numPackets; i++){
-  	    				System.out.println("sending fucking file");
-  	    				sendPacket(fs, i * packetSize);
+  	    				System.out.println("sending fucking packet " + i);
+  	    				sendNextPacket(fs);
   	    			}			
   	    		}
   	    		finally {
@@ -87,7 +86,7 @@ public class Client {
   	    }
   	}
   	
-  	private boolean receivePacket(FileReceiver fr, int index) throws IOException{
+  	private boolean receiveNextPacket(FileReceiver fr) throws IOException{
   		byte [] packet  = new byte [packetSize];
   		int bytesRead;
   		boolean packetReceived = false;
@@ -101,11 +100,10 @@ public class Client {
 		return packetReceived;
   	}
   	
-  	private void sendPacket(FileSender fs, int index) throws IOException{
+  	private void sendNextPacket(FileSender fs) throws IOException{
   		byte [] packet  = new byte [packetSize];
 		fs.getBis().read(packet,0,packetSize);
-		System.out.println("Sending packet index " + index + " from "  + sendFile + "(" + packet.length + " bytes)");
-		fs.getOs().write(packet,0,packet.length);
+		fs.getOs().write(packet,0,packetSize);
 		fs.getOs().flush();
 		System.out.println("Done.");
   	}
