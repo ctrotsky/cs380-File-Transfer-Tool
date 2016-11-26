@@ -26,6 +26,7 @@ public class Client {
   	public void receiveFile() throws IOException {
   		FileReceiver fr = null;
   		Socket sock = null;
+  		System.out.println("Waiting for connection to receive...");
   		try {
   			sock = new Socket(targetIP, socketPort);
   			System.out.println("Connecting...");
@@ -77,7 +78,7 @@ public class Client {
   	    try {
   	    	servsock = new ServerSocket(socketPort);
   	    	while (true) {	//TODO: only loop until termination of connection from receiver
-  	    		System.out.println("Waiting...");
+  	    		System.out.println("Waiting for connection to send...");
   	    		try {
   	    			sock = servsock.accept();
   	    			System.out.println("Accepted connection: " + sock);
