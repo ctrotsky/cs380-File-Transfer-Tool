@@ -1,13 +1,6 @@
 package filetransfer;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -18,7 +11,7 @@ public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
-	private String keyFilePath = "";		// not yet implemented
+	private String keyFilePath = "";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
@@ -26,9 +19,10 @@ public class Client {
 		socketPort = 13267;		// can change to whatever
 		targetIP = "127.0.0.1"; // localhost
 		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
-		packetSize = 3;
+		packetSize = 3;			// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
 	}
   	
+	//receives the file from the connected client.
   	public void receiveFile() throws IOException {
   		FileReceiver fr = null;
   		Socket sock = null;
@@ -39,11 +33,13 @@ public class Client {
   			// receive file
   			fr = new FileReceiver(filePath, sock);
   			byte[] receivedPacket = null;
+  			
+  			//loop through receiving packets
   			int i = 0;
   			do {
   				receivedPacket = receiveNextPacket(fr);
   				if (receivedPacket != null){
-  					System.out.println("received shit packet " + i);
+  					System.out.println("Received packet #" + i);
   					i++;
   					byte[] hash = receiveNextHash(fr);
   					if (checkIntegrity(receivedPacket, hash)){
@@ -52,15 +48,17 @@ public class Client {
   					}
   					else{
   						//Invalid packet
-  						System.out.println("Packet is goofed");
+  						System.out.println("Packet has does not match given hash!");
   					}
-  					//use mark if correct. use reset if incorrect. Reset will move back to last mark. Try for number of retries.
+  					//invalid packet handling not fully implemented yet.
+  					//use fr.getIs().mark if correct. use fr.getIs().reset if incorrect. Reset will move back to last mark. Try for number of retries.
   				}
   				else {
   					//notify receiver of successful completion of file transfer
   					//notify receiver to terminate connection
   				}
   			} while(receivedPacket != null);
+  			
   			
   			System.out.println("File " + filePath + " downloaded (" + i * packetSize + " bytes read)");
   		}
@@ -71,27 +69,30 @@ public class Client {
   		}
   	}
   	
+  	//sends the file to the connected client.
   	public void sendFile() throws IOException{
   	    ServerSocket servsock = null;
   	    Socket sock = null;
   	    FileSender fs = null;
   	    try {
   	    	servsock = new ServerSocket(socketPort);
-  	    	while (true) {
+  	    	while (true) {	//TODO: only loop until termination of connection from receiver
   	    		System.out.println("Waiting...");
   	    		try {
   	    			sock = servsock.accept();
-  	    			System.out.println("Accepted connection : " + sock);
+  	    			System.out.println("Accepted connection: " + sock);
   	    			// send file
   	    			fs = new FileSender(filePath, sock);
   	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
-  	    			System.out.println("file size: " + fs.getFile().length());
-  	    			System.out.println("number of fucking packets: " + numPackets);
+  	    			System.out.println("File Size: " + fs.getFile().length());
+  	    			System.out.println("Number of packets: " + numPackets);
+  	    			
+  	    			//loop through sending packets
   	    			for (int i = 0; i < numPackets; i++){
-  	    				System.out.println("sending fucking packet " + i);
-  	    				byte[] packet = sendNextPacket(fs);
-  	    				sendHashedPacket(fs, packet);
-  	    			}			
+  	    				System.out.println("Sending packet #" + i);
+  	    				byte[] packet = sendNextPacket(fs);	//send packet
+  	    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
+  	    			}
   	    		}
   	    		finally {
   	    			if (fs.getBis() != null) fs.getBis().close();
@@ -125,7 +126,7 @@ public class Client {
 		}
   	}
   	
-  //returns received hash
+  	//receives and returns the next hash from the connected client
   	private byte[] receiveNextHash(FileReceiver fr) throws IOException{
   		byte [] hash  = new byte [4];
   		
@@ -134,17 +135,17 @@ public class Client {
   		return (hash);
   	}
   	
-  	//returns packet so it can be used to sendHashedPacket in sendFile.
+  	//sends the next packet to the connected client, then returns the packet.
+  	//returns packet so it can be used to sendHashedPacket() in sendFile.
   	private byte[] sendNextPacket(FileSender fs) throws IOException{
   		byte [] packet  = new byte [packetSize];
 		fs.getBis().read(packet,0,packetSize);
 		fs.getOs().write(packet,0,packetSize);
 		fs.getOs().flush();
-		System.out.println("SENT PACKET:");
-		printByteArray(packet);
 		return packet;		
   	}
   	
+  	//hashes the given packet, and sends the hash to the connected client.
   	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
   		byte[] hashBytes = hashPacketBytes(packet);
   		
@@ -153,10 +154,9 @@ public class Client {
 		
 		fs.getOs().flush();
 		
-		System.out.println("SENT HASH:");
-		printByteArray(hashBytes);
   	}
   	
+  	//returns a byte array of the hash of the given packet.
   	private byte[] hashPacketBytes(byte[] packet){
   		int hash = 0;
   		
@@ -164,37 +164,21 @@ public class Client {
   			hash = hash *31 ^ b;
   		}
   		
-  		byte[] result = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();
-  		System.out.println("CALCULATING HASH:");
-		printByteArray(result);
-  		
-  		
+  		byte[] result = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();	
   		return result;
   	}
   	
-  	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){
-  		System.out.println("RECEIVED PACKET:");
-		printByteArray(receivedPacket);
-		System.out.println("RECEIVED HASH:");
-		printByteArray(receivedHash);
-  		
-  		
+  	//compares the received hash to the calculated hash of the received packet. Returns true if the packet has integrity. Returns false if the packet has been tampered with.
+  	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){	
   		byte[] hash = hashPacketBytes(receivedPacket);
-  		
-  		System.out.println("CALCULATED HASH:");
-		printByteArray(hash);
-  		
-  		if (Arrays.equals(receivedPacket, receivedHash)){
+
+  		if (Arrays.equals(hash, receivedHash)){
   			return true;
   		}
   		return false;
   	}
   	
-  	public void setSendFile(String filePath){
-  		this.filePath = filePath;
-  	}
-  	
-  	public void setReceiveFile(String filePath){
+  	public void setFilePath(String filePath){
   		this.filePath = filePath;
   	}
   	
@@ -224,17 +208,16 @@ public class Client {
   		System.out.println("=================");
   	}
   	
+  	//TODO: (in no particular order)
+  	//1. Send packet size to receiver before sending packets. Don't rely on receiver to hardcode correct packet size.
+  	//2. XOR encrypt sent packets with key file
+  	//3. Signal sender to terminate connection when successfully received file
+  	//4. Retry if packet is invalid (hash doesn't match)
+  	//			-- use mark() if correct, use reset() if invalid.
+    //5. Make separate method for writing received packet to file. Don't save packet unless it has been checked for integrity.
+  	//6. Authenticate with username and password
+  	//7. Terminate connection if connection lost.
+  	//8. Improve integrity hashing algorithm?
   	
-//  	public Socket establishConnection() throws IOException {
-//  		Socket sock = null;
-//  		
-//  		try {
-//  			sock = new Socket(SERVER, SOCKET_PORT);
-//  			System.out.println("Connecting...");
-//  		}
-//  		finally {
-//  			if (sock != null) sock.close();
-//  		}
-//  		return sock;
-//  	}
+  	
 }
