@@ -146,7 +146,7 @@ public class Client {
   	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
   		byte[] hashBytes = hashPacketBytes(packet);
   		fs.getBis().read(hashBytes,0,hashBytes.length);
-		fs.getOs().write(packet,0,hashBytes.length);
+		fs.getOs().write(hashBytes,0,hashBytes.length);
 		fs.getOs().flush();
 		System.out.println("Hash sent.");
   	}
@@ -161,8 +161,18 @@ public class Client {
   		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();		
   	}
   	
-  	private boolean checkIntegrity(byte[] packet, byte[] receivedHash){
-  		byte[] hash = hashPacketBytes(packet);
+  	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){
+  		System.out.println("RECEIVED PACKET:");
+		printByteArray(receivedPacket);
+		System.out.println("RECEIVED HASH:");
+		printByteArray(receivedHash);
+  		
+  		
+  		byte[] hash = hashPacketBytes(receivedPacket);
+  		
+  		System.out.println("CALCULATED HASH:");
+		printByteArray(hash);
+  		
   		if (hash.equals(receivedHash)){
   			return true;
   		}
@@ -192,6 +202,17 @@ public class Client {
   	public void setPacketSize(int packetSize){
   		this.packetSize = packetSize;
   	}
+  	
+  	
+  	//For testing only. Delete when done.
+  	private void printByteArray(byte[] bytes){
+  		System.out.println("=================");
+  		for (byte b : bytes){
+  			System.out.println(b);
+  		}
+  		System.out.println("=================");
+  	}
+  	
   	
 //  	public Socket establishConnection() throws IOException {
 //  		Socket sock = null;
