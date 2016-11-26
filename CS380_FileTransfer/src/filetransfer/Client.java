@@ -17,6 +17,7 @@ public class Client {
 	private String receiveFile = "E:/Documents/SocketTesting/FileClient1/ReceiveFile.txt";
 	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";
 	private String keyFile = "";
+	private int packetSize = 1000;
 
   	public final static int FILE_SIZE = 6022386; // file size temporary hard coded
                                                // should bigger than the file to be downloaded
@@ -25,8 +26,7 @@ public class Client {
   	public void receiveFile() throws IOException {
   		int bytesRead;
   		int current = 0;
-  		FileOutputStream fos = null;
-  		BufferedOutputStream bos = null;
+  		FileReceiver fr = null;
   		Socket sock = null;
   		try {
   			sock = new Socket(targetIP, socketPort);
@@ -34,25 +34,21 @@ public class Client {
 
   			// receive file
   			byte [] mybytearray  = new byte [FILE_SIZE];
+  			fr = new FileReceiver(receiveFile, sock);
   			InputStream is = sock.getInputStream();
-  			fos = new FileOutputStream(receiveFile);
-  			bos = new BufferedOutputStream(fos);
   			bytesRead = is.read(mybytearray,0,mybytearray.length);
   			current = bytesRead;
-
-  			do {
-  				bytesRead =
-  						is.read(mybytearray, current, (mybytearray.length-current));
-  				if(bytesRead >= 0) current += bytesRead;
-  			} while(bytesRead > -1);
-
-  			bos.write(mybytearray, 0 , current);
-  			bos.flush();
+		
+  			int i = 0;
+  			while (i < FILE_SIZE){
+  				receivePacket(fr, i);
+  				i+=packetSize;
+  			}
   			System.out.println("File " + receiveFile + " downloaded (" + current + " bytes read)");
   		}
   		finally {
-  			if (fos != null) fos.close();
-  			if (bos != null) bos.close();
+  			if (fr.getFos() != null) fr.getFos().close();
+  			if (fr.getBos() != null) fr.getBos().close();
   			if (sock != null) sock.close();
   		}
   	}
@@ -69,14 +65,11 @@ public class Client {
   	    			sock = servsock.accept();
   	    			System.out.println("Accepted connection : " + sock);
   	    			// send file
-  	    			fs = new FileSender(new File (sendFile), sock);
-  	    			File myFile = new File (sendFile);
-  	    			byte [] mybytearray  = new byte [(int)myFile.length()];
-  	    			fs.getBis().read(mybytearray,0,mybytearray.length);
-  	    			System.out.println("Sending " + sendFile + "(" + mybytearray.length + " bytes)");
-  	    			fs.getOs().write(mybytearray,0,mybytearray.length);
-  	    			fs.getOs().flush();
-  	    			System.out.println("Done.");
+  	    			fs = new FileSender(sendFile, sock);
+  	    			int numPackets = (int) (fs.getFile().length() / packetSize);
+  	    			for (int i = 0; i < numPackets; i++){
+  	    				sendPacket(fs, i * packetSize);
+  	    			}			
   	    		}
   	    		finally {
   	    			if (fs.getBis() != null) fs.getBis().close();
@@ -90,8 +83,29 @@ public class Client {
   	    }
   	}
   	
-  	private void sendPacket(FileSender fs, int index){
-  		
+  	private void receivePacket(FileReceiver fr, int index) throws IOException{
+  		byte [] packet  = new byte [packetSize];
+  		int bytesRead = fr.getIs().read(packet,index,index + packetSize); //might go over end of file?
+		int current = bytesRead;
+
+		do {
+			bytesRead = fr.getIs().read(packet, current, (packet.length-current));
+			if(bytesRead >= 0) {
+				current += bytesRead;
+			}
+		} while(bytesRead > -1);
+
+		fr.getBos().write(packet, index , index + bytesRead);	//maybe should be +packetSize
+		fr.getBos().flush();
+  	}
+  	
+  	private void sendPacket(FileSender fs, int index) throws IOException{
+  		byte [] packet  = new byte [packetSize];
+		fs.getBis().read(packet,index,index + packet.length);
+		System.out.println("Sending packet index " + index + " from "  + sendFile + "(" + packet.length + " bytes)");
+		fs.getOs().write(packet,index,index + packet.length);
+		fs.getOs().flush();
+		System.out.println("Done.");
   	}
   	
   	public void setSendFile(String filePath){
@@ -112,6 +126,10 @@ public class Client {
   	
   	public void setKeyFile(String filePath){
   		keyFile = filePath;
+  	}
+  	
+  	public void setPacketSize(int packetSize){
+  		this.packetSize = packetSize;
   	}
   	
 //  	public Socket establishConnection() throws IOException {

@@ -3,10 +3,8 @@ package filetransfer;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 //Wrapper class for objects needed for sending files
@@ -17,8 +15,8 @@ public class FileSender {
 	private OutputStream os;
 	private Socket sock;
 
-	public FileSender(File file, Socket sock) throws IOException{
-		this.file = file;
+	public FileSender(String filePath, Socket sock) throws IOException{
+		file = new File(filePath);
 		fis = new FileInputStream(file);
 		bis = new BufferedInputStream(fis);
 		os = sock.getOutputStream();
