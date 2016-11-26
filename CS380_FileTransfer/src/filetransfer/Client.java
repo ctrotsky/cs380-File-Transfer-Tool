@@ -17,7 +17,7 @@ public class Client {
 	private String receiveFile = "E:/Documents/SocketTesting/FileClient1/ReceiveFile.txt";
 	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";
 	private String keyFile = "";
-	private int packetSize = 1000;
+	private int packetSize = 3;
 
   	public final static int FILE_SIZE = 6022386; // file size temporary hard coded
                                                // should bigger than the file to be downloaded
@@ -40,7 +40,7 @@ public class Client {
   			current = bytesRead;
 		
   			int i = 0;
-  			while (i < FILE_SIZE){
+  			while (receivePacket(fr,i)){
   				receivePacket(fr, i);
   				i+=packetSize;
   			}
@@ -66,8 +66,11 @@ public class Client {
   	    			System.out.println("Accepted connection : " + sock);
   	    			// send file
   	    			fs = new FileSender(sendFile, sock);
-  	    			int numPackets = (int) (fs.getFile().length() / packetSize);
+  	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize);
+  	    			System.out.println("file size: " + fs.getFile().length());
+  	    			System.out.println("number of fucking packets: " + numPackets);
   	    			for (int i = 0; i < numPackets; i++){
+  	    				System.out.println("sending fucking file");
   	    				sendPacket(fs, i * packetSize);
   	    			}			
   	    		}
@@ -83,27 +86,30 @@ public class Client {
   	    }
   	}
   	
-  	private void receivePacket(FileReceiver fr, int index) throws IOException{
+  	private boolean receivePacket(FileReceiver fr, int index) throws IOException{
   		byte [] packet  = new byte [packetSize];
-  		int bytesRead = fr.getIs().read(packet,index,index + packetSize); //might go over end of file?
+  		int bytesRead = fr.getIs().read(packet,0,packetSize); //might go over end of file?
 		int current = bytesRead;
+		boolean packetReceived = false;
 
 		do {
 			bytesRead = fr.getIs().read(packet, current, (packet.length-current));
 			if(bytesRead >= 0) {
 				current += bytesRead;
+				packetReceived = true;
 			}
 		} while(bytesRead > -1);
 
-		fr.getBos().write(packet, index , index + bytesRead);	//maybe should be +packetSize
+		fr.getBos().write(packet, 0 , packet.length);	//maybe should be +packetSize
 		fr.getBos().flush();
+		return packetReceived;
   	}
   	
   	private void sendPacket(FileSender fs, int index) throws IOException{
   		byte [] packet  = new byte [packetSize];
-		fs.getBis().read(packet,index,index + packet.length);
+		fs.getBis().read(packet,0,packetSize);
 		System.out.println("Sending packet index " + index + " from "  + sendFile + "(" + packet.length + " bytes)");
-		fs.getOs().write(packet,index,index + packet.length);
+		fs.getOs().write(packet,0,packet.length);
 		fs.getOs().flush();
 		System.out.println("Done.");
   	}
