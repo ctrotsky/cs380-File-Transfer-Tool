@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 public class Client {
 	private int socketPort;					// port to connect to
@@ -139,16 +140,21 @@ public class Client {
 		fs.getBis().read(packet,0,packetSize);
 		fs.getOs().write(packet,0,packetSize);
 		fs.getOs().flush();
-		System.out.println("Packet sent.");
+		System.out.println("SENT PACKET:");
+		printByteArray(packet);
 		return packet;		
   	}
   	
   	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
   		byte[] hashBytes = hashPacketBytes(packet);
-  		fs.getBis().read(hashBytes,0,hashBytes.length);
+  		
+  		
 		fs.getOs().write(hashBytes,0,hashBytes.length);
+		
 		fs.getOs().flush();
-		System.out.println("Hash sent.");
+		
+		System.out.println("SENT HASH:");
+		printByteArray(hashBytes);
   	}
   	
   	private byte[] hashPacketBytes(byte[] packet){
@@ -158,7 +164,12 @@ public class Client {
   			hash = hash *31 ^ b;
   		}
   		
-  		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();		
+  		byte[] result = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();
+  		System.out.println("CALCULATING HASH:");
+		printByteArray(result);
+  		
+  		
+  		return result;
   	}
   	
   	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){
@@ -173,7 +184,7 @@ public class Client {
   		System.out.println("CALCULATED HASH:");
 		printByteArray(hash);
   		
-  		if (hash.equals(receivedHash)){
+  		if (Arrays.equals(receivedPacket, receivedHash)){
   			return true;
   		}
   		return false;
