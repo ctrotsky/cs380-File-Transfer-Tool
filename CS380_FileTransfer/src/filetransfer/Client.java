@@ -40,7 +40,8 @@ public class Client {
   			current = bytesRead;
 		
   			int i = 0;
-  			while (receivePacket(fr,i)){
+  			while (receivePacket(fr, i)){
+  				System.out.println("receiving shit");
   				receivePacket(fr, i);
   				i+=packetSize;
   			}
@@ -88,19 +89,14 @@ public class Client {
   	
   	private boolean receivePacket(FileReceiver fr, int index) throws IOException{
   		byte [] packet  = new byte [packetSize];
-  		int bytesRead = fr.getIs().read(packet,0,packetSize); //might go over end of file?
-		int current = bytesRead;
-		boolean packetReceived = false;
-
-		do {
-			bytesRead = fr.getIs().read(packet, current, (packet.length-current));
-			if(bytesRead >= 0) {
-				current += bytesRead;
-				packetReceived = true;
-			}
-		} while(bytesRead > -1);
-
-		fr.getBos().write(packet, 0 , packet.length);	//maybe should be +packetSize
+  		int bytesRead;
+  		boolean packetReceived = false;
+  		
+  		while ((bytesRead = fr.getIs().read(packet)) > 0){
+  			fr.getBos().write(packet, 0, bytesRead);
+  			packetReceived = true;
+  		}
+  		
 		fr.getBos().flush();
 		return packetReceived;
   	}
