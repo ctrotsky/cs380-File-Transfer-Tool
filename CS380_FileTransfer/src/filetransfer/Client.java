@@ -10,22 +10,25 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class Client {
-	private int socketPort = 13267;      // you may change this
-	private String targetIP = "127.0.0.1";  // localhost
-	private String receiveFile = "E:/Documents/SocketTesting/FileClient1/ReceiveFile.txt";
-	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";
-	private String keyFile = "";
-	private int packetSize = 3;
-
-  	public final static int FILE_SIZE = 6022386; // file size temporary hard coded
-                                               // should bigger than the file to be downloaded
-
+	private int socketPort;					// port to connect to
+	private String targetIP;				// IP to connect to
+	private String filePath;				// path to file to send/receive
+	private String keyFilePath = "";		// not yet implemented
+	private int packetSize;					// packet size in bytes
+	
+	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
+	public Client(){
+		socketPort = 13267;		// can change to whatever
+		targetIP = "127.0.0.1"; // localhost
+		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
+		packetSize = 3;
+	}
   	
   	public void receiveFile() throws IOException {
-  		int bytesRead;
-  		int current = 0;
   		FileReceiver fr = null;
   		Socket sock = null;
   		try {
@@ -33,7 +36,7 @@ public class Client {
   			System.out.println("Connecting...");
 
   			// receive file
-  			fr = new FileReceiver(receiveFile, sock);
+  			fr = new FileReceiver(filePath, sock);
   			boolean receivedPacket = false;
   			int i = 0;
   			do {
@@ -41,10 +44,16 @@ public class Client {
   				if (receivedPacket){
   					System.out.println("received shit packet " + i);
   					i++;
+  					//check integrity here
+  					//use mark if correct. use reset if incorrect. Reset will move back to last mark. Try for number of retries.
+  				}
+  				else {
+  					//notify receiver of successful completion of file transfer
+  					//notify receiver to terminate connection
   				}
   			} while(receivedPacket);
   			
-  			System.out.println("File " + receiveFile + " downloaded (" + i * packetSize + " bytes read)");
+  			System.out.println("File " + filePath + " downloaded (" + i * packetSize + " bytes read)");
   		}
   		finally {
   			if (fr.getFos() != null) fr.getFos().close();
@@ -65,13 +74,14 @@ public class Client {
   	    			sock = servsock.accept();
   	    			System.out.println("Accepted connection : " + sock);
   	    			// send file
-  	    			fs = new FileSender(sendFile, sock);
+  	    			fs = new FileSender(filePath, sock);
   	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
   	    			System.out.println("file size: " + fs.getFile().length());
   	    			System.out.println("number of fucking packets: " + numPackets);
   	    			for (int i = 0; i < numPackets; i++){
   	    				System.out.println("sending fucking packet " + i);
-  	    				sendNextPacket(fs);
+  	    				byte[] packet = sendNextPacket(fs);
+  	    				//sendHashedPacket(fs, packet);
   	    			}			
   	    		}
   	    		finally {
@@ -86,7 +96,7 @@ public class Client {
   	    }
   	}
   	
-  	//returns true if there was a packet to receive
+  	//returns true if there was a packet to receive.
   	private boolean receiveNextPacket(FileReceiver fr) throws IOException{
   		byte [] packet  = new byte [packetSize];
   		int bytesRead;
@@ -95,27 +105,46 @@ public class Client {
   		if ((bytesRead = fr.getIs().read(packet)) > 0){
   			fr.getBos().write(packet, 0, bytesRead);
   			packetReceived = true;
-  		}
-  		
-  		
+  		}	
+ 		
 		fr.getBos().flush();
 		return packetReceived;
   	}
   	
-  	private void sendNextPacket(FileSender fs) throws IOException{
+  	//returns packet so it can be used to sendHashedPacket in sendFile.
+  	private byte[] sendNextPacket(FileSender fs) throws IOException{
   		byte [] packet  = new byte [packetSize];
 		fs.getBis().read(packet,0,packetSize);
 		fs.getOs().write(packet,0,packetSize);
 		fs.getOs().flush();
-		System.out.println("Done.");
+		System.out.println("Packet sent.");
+		return packet;		
+  	}
+  	
+  	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
+  		byte[] hashBytes = hashPacketBytes(packet);
+  		fs.getBis().read(hashBytes,0,hashBytes.length);
+		fs.getOs().write(packet,0,hashBytes.length);
+		fs.getOs().flush();
+		System.out.println("Hash sent.");
+  	}
+  	
+  	private byte[] hashPacketBytes(byte[] packet){
+  		int hash = 0;
+  		
+  		for (byte b : packet){
+  			hash = hash *31 ^ b;
+  		}
+  		
+  		return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(hash).array();		
   	}
   	
   	public void setSendFile(String filePath){
-  		sendFile = filePath;
+  		this.filePath = filePath;
   	}
   	
   	public void setReceiveFile(String filePath){
-  		receiveFile = filePath;
+  		this.filePath = filePath;
   	}
   	
   	public void setTargetIP(String ip){
@@ -127,7 +156,7 @@ public class Client {
   	}
   	
   	public void setKeyFile(String filePath){
-  		keyFile = filePath;
+  		keyFilePath = filePath;
   	}
   	
   	public void setPacketSize(int packetSize){
