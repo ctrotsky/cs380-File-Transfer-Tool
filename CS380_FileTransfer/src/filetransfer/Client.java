@@ -12,8 +12,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Client {
-	public final static int SOCKET_PORT = 13267;      // you may change this
-	public final static String SERVER = "127.0.0.1";  // localhost
+	private int socketPort = 13267;      // you may change this
+	private String targetIP = "127.0.0.1";  // localhost
 	private String receiveFile = "E:/Documents/SocketTesting/FileClient1/ReceiveFile.txt";
 	private String sendFile = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";// you may change this, I give a
 	                                                            // different name because i don't want to
@@ -30,7 +30,7 @@ public class Client {
   		BufferedOutputStream bos = null;
   		Socket sock = null;
   		try {
-  			sock = new Socket(SERVER, SOCKET_PORT);
+  			sock = new Socket(targetIP, socketPort);
   			System.out.println("Connecting...");
 
   			// receive file
@@ -65,7 +65,7 @@ public class Client {
   	    ServerSocket servsock = null;
   	    Socket sock = null;
   	    try {
-  	    	servsock = new ServerSocket(SOCKET_PORT);
+  	    	servsock = new ServerSocket(socketPort);
   	    	while (true) {
   	    		System.out.println("Waiting...");
   	    		try {
@@ -101,6 +101,14 @@ public class Client {
   	
   	public void setReceiveFile(String filePath){
   		receiveFile = filePath;
+  	}
+  	
+  	public void setTargetIP(String ip){
+  		targetIP = ip;
+  	}
+  	
+  	public void setSocketPort(int port){
+  		socketPort = port;
   	}
   	
 //  	public Socket establishConnection() throws IOException {
