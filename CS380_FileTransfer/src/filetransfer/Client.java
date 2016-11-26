@@ -37,11 +37,11 @@ public class Client {
 
   			// receive file
   			fr = new FileReceiver(filePath, sock);
-  			boolean receivedPacket = false;
+  			byte[] receivedPacket = null;
   			int i = 0;
   			do {
   				receivedPacket = receiveNextPacket(fr);
-  				if (receivedPacket){
+  				if (receivedPacket != null){
   					System.out.println("received shit packet " + i);
   					i++;
   					//check integrity here
@@ -51,7 +51,7 @@ public class Client {
   					//notify receiver of successful completion of file transfer
   					//notify receiver to terminate connection
   				}
-  			} while(receivedPacket);
+  			} while(receivedPacket != null);
   			
   			System.out.println("File " + filePath + " downloaded (" + i * packetSize + " bytes read)");
   		}
@@ -96,8 +96,8 @@ public class Client {
   	    }
   	}
   	
-  	//returns true if there was a packet to receive.
-  	private boolean receiveNextPacket(FileReceiver fr) throws IOException{
+  	//returns packet if it was received. else returns null.
+  	private byte[] receiveNextPacket(FileReceiver fr) throws IOException{
   		byte [] packet  = new byte [packetSize];
   		int bytesRead;
   		boolean packetReceived = false;
@@ -108,7 +108,12 @@ public class Client {
   		}	
  		
 		fr.getBos().flush();
-		return packetReceived;
+		if (packetReceived){
+			return packet;
+		}
+		else {
+			return null;
+		}
   	}
   	
   	//returns packet so it can be used to sendHashedPacket in sendFile.
