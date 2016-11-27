@@ -11,7 +11,7 @@ public class Driver {
 		sendClient.setTargetIP("192.168.1.13");
 		sendClient.setSocketPort(13267);
 		sendClient.setPacketSize(3);
-		sendClient.sendFileNew();
+		sendClient.sendFile();
 		
 //		//Leave uncommented on computer that will receive file.
 //		Client receiveClient = new Client();
