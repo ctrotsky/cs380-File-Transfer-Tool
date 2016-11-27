@@ -81,72 +81,8 @@ public class Client {
   		}
   	}
   	
-  	//sends the file to the connected client.
-  	public void sendFile() throws IOException, InterruptedException{
-  	    ServerSocket servsock = null;
-  	    Socket sock = null;
-  	    FileSender fs = null;
-  	    byte[] packet = null;
-  	    InputStream responseIs = null;
-  	    
-  	    try {
-  	    	servsock = new ServerSocket(socketPort);
-  	    	while (true) {	//TODO: only loop until termination of connection from receiver
-  	    		System.out.println("Waiting for connection to send...");
-  	    		try {
-  	    			sock = servsock.accept();
-  	    			System.out.println("Accepted connection: " + sock);
-  	    			
-  	    			
-  	    			// send file
-  	    			fs = new FileSender(filePath, sock);
-  	    			responseIs = sock.getInputStream();
-  	    			
-  	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
-  	    			System.out.println("File Size: " + fs.getFile().length());
-  	    			System.out.println("Number of packets: " + numPackets);
-  	    			
-  	    			boolean moveToNextPacket = true;
-  	    			//loop through sending packets
-  	    			int i = 0;
-  	    			while (i < numPackets){
-  	    				System.out.println("Sending packet #" + i);
-  	    				if (moveToNextPacket){	
-	  	    				packet = prepareNextPacket(fs);
-	  	    				i++;
-  	    				}
-  	    				
-  	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
-  	    				sendPacket(fs, packet);					//send packet
-  	    				sendChecksum(fs, packet);			//send hash of that packet for checking integrity
-  	    				boolean timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);	//wait to receive signal that packet was successful
-  	    				boolean successfulReceive = checkSignal(responseIs);
-  	    				if (successfulReceive && !timedOut){			//if packet was received successfully and signal did not time out
-  	    					moveToNextPacket = true;
-  	    				}
-  	    				else {
-  	    					System.out.println("last packet not received correctly, retrying");
-  	    					moveToNextPacket = false;
-  	    				}
-  	    				
-  	    			}	
-  	    			
-  	    		}
-  	    		finally {
-  	    			if (fs.getBis() != null) fs.getBis().close();
-  	    			if (fs.getOs() != null) fs.getOs().close();
-  	    			if (sock!=null) sock.close();
-  	    		}
-  	    	}
-  	    }
-  	    finally {
-  	    	if (servsock != null) servsock.close();
-  	    }
-  	}	
-  	
-  	
   //sends the file to the connected client.
-  	public void sendFileNew(){
+  	public void sendFile(){
   	    ServerSocket servsock = null;
   	    Socket sock = null;
   	    FileSender fs = null;
