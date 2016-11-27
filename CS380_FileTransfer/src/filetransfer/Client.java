@@ -142,7 +142,7 @@ public class Client {
   	private void waitForReceive(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
 			//wait for full packet to arrive before continuing
 			int curAttempt = 0;
-			while (is.available() < packetSize && curAttempt < attempts){
+			while (is.available() < reqBytes && curAttempt < attempts){
 				curAttempt++;
 				Thread.sleep(10);
 			}
