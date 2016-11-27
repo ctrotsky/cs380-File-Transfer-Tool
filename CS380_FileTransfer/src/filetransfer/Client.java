@@ -53,7 +53,7 @@ public class Client {
   				if (receivedPacket != null){
   					System.out.println("Received packet #" + i);
   					byte[] hash = receiveNextHash(fr);
-  					if (checkIntegrity(receivedPacket, hash)){
+  					if (checkIntegrity(receivedPacket, hash) && !timedOut){
   						System.out.println("Packet has integrity");
   						i++;
   						//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
@@ -61,7 +61,7 @@ public class Client {
   						signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
   					}
   					else{
-  						System.out.println("Packet has does not match given hash!");
+  						System.out.println("Packet needs to be resent");
   						signalPacketReceived(responseOs, false);	//let sender know packet was not correct, need to resend packet
   					}
   				}
@@ -120,8 +120,6 @@ public class Client {
   	    				sendHashedPacket(fs, packet);			//send hash of that packet for checking integrity
   	    				boolean timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);	//wait to receive signal that packet was successful
   	    				boolean successfulReceive = checkSignal(responseIs);
-  	    				System.out.println("Timed out: " + timedOut);
-  	    				System.out.println("Successful Receive: " + successfulReceive);
   	    				if (successfulReceive && !timedOut){			//if packet was received successfully and signal did not time out
   	    					moveToNextPacket = true;
   	    				}
@@ -175,9 +173,13 @@ public class Client {
   	}
   	
   	private void signalPacketReceived(OutputStream os, boolean successful) throws IOException{
-  		byte[] result = {(byte)(successful?1:0)};
-  		System.out.println("Result: ");
-  		printByteArray(result);
+  		byte[] result = new byte[1];
+  		if (successful){
+  			result[0] = 1;
+  		}
+  		else {
+  			result[0] = 0;
+  		}
   		os.write(result,0,1);	//only one byte for boolean
 		os.flush();
   	}
