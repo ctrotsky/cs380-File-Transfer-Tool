@@ -118,7 +118,7 @@ public class Client {
   	    				
   	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
   	    				sendPacket(fs, packet);					//send packet
-  	    				sendHashedPacket(fs, packet);			//send hash of that packet for checking integrity
+  	    				sendChecksum(fs, packet);			//send hash of that packet for checking integrity
   	    				boolean timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);	//wait to receive signal that packet was successful
   	    				boolean successfulReceive = checkSignal(responseIs);
   	    				if (successfulReceive && !timedOut){			//if packet was received successfully and signal did not time out
@@ -143,6 +143,86 @@ public class Client {
   	    	if (servsock != null) servsock.close();
   	    }
   	}	
+  	
+  	
+  //sends the file to the connected client.
+  	public void sendFileNew(){
+  	    ServerSocket servsock = null;
+  	    Socket sock = null;
+  	    FileSender fs = null;
+  	    
+  	    InputStream responseIs = null;
+  	    
+  	    try {
+  	    	sock = establishConnection(servsock, socketPort);
+  	    	fs = new FileSender(filePath, sock);
+  			responseIs = sock.getInputStream();
+  			
+  			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
+  			System.out.println("File Size: " + fs.getFile().length());
+  			System.out.println("Number of packets: " + numPackets);
+  			
+  			sendAllPackets(fs, responseIs, numPackets);
+  			terminateConnection(servsock, sock, fs, responseIs);
+  			
+  	    }
+  		catch (IOException e) {
+  			System.err.println("IOException: " + e.getMessage());
+  		}
+  	    catch (InterruptedException e) {
+			System.err.println("InterruptedException: " + e.getMessage());
+		}
+  	}	
+  	
+  	//Establishes connection. Returns Socket that is connected.
+  	private Socket establishConnection(ServerSocket servsock, int port) throws IOException{
+  		Socket sock;
+  		System.out.println("Waiting for connection...");
+  		servsock = new ServerSocket(port);
+  		sock = servsock.accept();
+		System.out.println("Accepted connection: " + sock);
+		servsock.close();
+		return sock;
+  	}
+  	
+  	//Terminates connection by closing all streams.
+  	private void terminateConnection(ServerSocket servsock, Socket sock, FileSender fs, InputStream responseIs) throws IOException{
+  			if (servsock != null) servsock.close();
+	    	if (fs != null){
+	  	    	if (fs.getBis() != null) fs.getBis().close();
+	  			if (fs.getOs() != null) fs.getOs().close();
+	    	}
+			if (sock!=null) sock.close();
+			if (responseIs != null) responseIs.close();
+  	}
+  	
+  	private void sendAllPackets(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
+  		boolean moveToNextPacket = true;
+		boolean timedOut = false;
+		boolean successfulReceive;
+		byte[] packet = null;
+		
+		//loop through sending each packet
+		int i = 0;
+		while (i < numPackets){
+			System.out.println("Sending packet #" + i);
+			if (moveToNextPacket){	
+				packet = prepareNextPacket(fs);
+				i++;
+			}	
+		sendPacket(fs, packet);				
+		sendChecksum(fs, packet);
+		timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);		//wait until 1 byte arrives (signal that last packet was successful)
+		successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
+		if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
+				moveToNextPacket = true;
+			}
+			else {
+				System.out.println("last packet not received correctly, retrying");
+				moveToNextPacket = false;
+			}
+		}
+  	}
   	
   	
   	//should make this return false if timed out
@@ -225,7 +305,7 @@ public class Client {
    	
   	
   	//hashes the given packet, and sends the hash to the connected client.
-  	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
+  	private void sendChecksum(FileSender fs, byte[] packet) throws IOException{
   		byte[] hashBytes = hashPacketBytes(packet);
   		
   		
