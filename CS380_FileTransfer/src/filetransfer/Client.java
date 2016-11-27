@@ -44,7 +44,7 @@ public class Client {
   			int i = 0;
   			do {
   				waitForReceive(fr.getIs(), 10000, packetSize);	//wait for full packet to arrive
-  				receivedPacket = receiveNextPacket(fr);
+  				receivedPacket = receiveNextPacket(fr);		
   				if (receivedPacket != null){
   					System.out.println("Received packet #" + i);
   					byte[] hash = receiveNextHash(fr);
@@ -52,6 +52,7 @@ public class Client {
   						//Valid packet. carry on.
   						System.out.println("Packet has integrity");
   						i++;
+  						//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
   						writePacketToFile(fr, receivedPacket, packetSize);
   						signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
   					}
@@ -111,6 +112,7 @@ public class Client {
 	  	    				System.out.println("Sending packet #" + i);
 	  	    				packet = prepareNextPacket(fs);
   	    				}
+  	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
   	    				sendPacket(fs, packet);				//send packet
   	    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
   	    				waitForReceive(responseIs, 1000, 1); //wait to receive signal that packet was successful
