@@ -1,5 +1,6 @@
 package filetransfer;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,63 +26,30 @@ public class Client {
 		packetSize = 3;			// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
 	}
   	
-	//receives the file from the connected client.
-  	public void receiveFile() throws IOException, InterruptedException {
-  		FileReceiver fr = null;
-  		OutputStream responseOs = null;
-  		Socket sock = null;
-  		System.out.println("Waiting for connection to receive...");
-  		try {
-  			sock = new Socket(targetIP, socketPort);
-  			System.out.println("Connecting...");
-
-  			// receive file
-  			fr = new FileReceiver(filePath, sock);
-  			responseOs = sock.getOutputStream();
-  			
-  			byte[] receivedPacket = null;
-  			
-  			//loop through receiving packets
-  			int i = 0;
-  			do {
-  				boolean timedOut = waitForReceive(fr.getIs(), TIMEOUT_TIME, packetSize);	//wait for full packet to arrive
-  				if (timedOut == true){
-  					System.out.println("Did not receive full packet!!!!! Timed out");
-  				}
-  				
-  				receivedPacket = receiveNextPacket(fr);		
-  				if (receivedPacket != null){
-  					System.out.println("Received packet #" + i);
-  					byte[] hash = receiveNextHash(fr);
-  					if (checkIntegrity(receivedPacket, hash) && !timedOut){
-  						System.out.println("Packet has integrity");
-  						i++;
-  						//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
-  						writePacketToFile(fr, receivedPacket, packetSize);
-  						signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
-  					}
-  					else{
-  						System.out.println("Packet needs to be resent");
-  						signalPacketReceived(responseOs, false);	//let sender know packet was not correct, need to resend packet
-  					}
-  				}
-  				else {
-  					//notify receiver of successful completion of file transfer
-  					//notify receiver to terminate connection
-  				}
-  			} while(receivedPacket != null);
-  			
-  			
-  			System.out.println("File " + filePath + " downloaded (" + i * packetSize + " bytes read)");
-  		}
-  		finally {
-  			if (fr.getFos() != null) fr.getFos().close();
-  			if (fr.getBos() != null) fr.getBos().close();
-  			if (sock != null) sock.close();
-  		}
+  	public void receiveFile(){
+  	    Socket sock = null;
+  	    FileReceiver fr = null;
+  	    
+  	    OutputStream responseOs = null;
+  	    
+  	    try {
+	    	sock = new Socket(targetIP, socketPort);
+	    	fr = new FileReceiver(filePath, sock);
+	    	responseOs = sock.getOutputStream();
+	    	
+	    	//TODO: validate username/password here
+	    	receiveAllPackets(fr, responseOs);
+	    	terminateReceivingConnection(sock, fr, responseOs);
+  	  	}
+  	    catch (IOException e) {
+			System.err.println("IOException: " + e.getMessage());
+		}
+	    catch (InterruptedException e) {
+			System.err.println("InterruptedException: " + e.getMessage());
+		}
   	}
   	
-  //sends the file to the connected client.
+  	//sends the file to the connected client.
   	public void sendFile(){
   	    ServerSocket servsock = null;
   	    Socket sock = null;
@@ -99,7 +67,7 @@ public class Client {
   			System.out.println("Number of packets: " + numPackets);
   			
   			sendAllPackets(fs, responseIs, numPackets);
-  			terminateConnection(servsock, sock, fs, responseIs);
+  			terminateSendingConnection(servsock, sock, fs, responseIs);
   			
   	    }
   		catch (IOException e) {
@@ -122,14 +90,53 @@ public class Client {
   	}
   	
   	//Terminates connection by closing all streams.
-  	private void terminateConnection(ServerSocket servsock, Socket sock, FileSender fs, InputStream responseIs) throws IOException{
+  	private void terminateSendingConnection(ServerSocket servsock, Socket sock, Closeable filehandler, Closeable responseStream) throws IOException{
   			if (servsock != null) servsock.close();
-	    	if (fs != null){
-	  	    	if (fs.getBis() != null) fs.getBis().close();
-	  			if (fs.getOs() != null) fs.getOs().close();
-	    	}
+	    	if (filehandler != null) filehandler.close();
 			if (sock!=null) sock.close();
-			if (responseIs != null) responseIs.close();
+			if (responseStream != null) responseStream.close();
+  	}
+  	
+  //Terminates connection by closing all streams.
+  	private void terminateReceivingConnection(Socket sock, Closeable filehandler, Closeable responseStream) throws IOException{
+	    	if (filehandler != null) filehandler.close();
+			if (sock!=null) sock.close();
+			if (responseStream != null) responseStream.close();
+  	}
+  	
+  	
+  	private void receiveAllPackets(FileReceiver fr, OutputStream responseOs) throws IOException, InterruptedException{
+  		//loop through receiving packets
+  		byte[] receivedPacket;
+  		
+		int i = 0;
+		do {
+			boolean timedOut = waitForAvailable(fr.getIs(), TIMEOUT_TIME, packetSize);	//wait for full packet to arrive and be available
+			if (timedOut == true){
+				System.out.println("Did not receive full packet. Timed out");
+			}
+			
+			receivedPacket = receiveNextPacket(fr);		
+			if (receivedPacket != null){
+				System.out.println("Received packet #" + i);
+				byte[] hash = receiveNextChecksum(fr);
+				if (checkIntegrity(receivedPacket, hash) && !timedOut){
+					System.out.println("Packet has integrity");
+					i++;
+					//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
+					writePacketToFile(fr, receivedPacket, packetSize);
+					signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
+				}
+				else{
+					System.out.println("Packet needs to be resent");
+					signalPacketReceived(responseOs, false);	//let sender know packet was not correct, need to resend packet
+				}
+			}
+			else {
+				//notify receiver of successful completion of file transfer
+				//notify receiver to terminate connection
+			}
+		} while(receivedPacket != null);
   	}
   	
   	private void sendAllPackets(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
@@ -148,7 +155,7 @@ public class Client {
 			}	
 		sendPacket(fs, packet);				
 		sendChecksum(fs, packet);
-		timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);		//wait until 1 byte arrives (signal that last packet was successful)
+		timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);		//wait until 1 byte arrives (signal that last packet was successful)
 		successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
 		if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
 				moveToNextPacket = true;
@@ -162,7 +169,7 @@ public class Client {
   	
   	
   	//should make this return false if timed out
-  	private boolean waitForReceive(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
+  	private boolean waitForAvailable(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
 			//wait for full packet to arrive before continuing
 			int curAttempt = 0;
 			while (is.available() < reqBytes && curAttempt < attempts){
@@ -216,7 +223,7 @@ public class Client {
   	}
   	
   	//receives and returns the next hash from the connected client
-  	private byte[] receiveNextHash(FileReceiver fr) throws IOException{
+  	private byte[] receiveNextChecksum(FileReceiver fr) throws IOException{
   		byte [] hash  = new byte [4];
   		
   		fr.getIs().read(hash);

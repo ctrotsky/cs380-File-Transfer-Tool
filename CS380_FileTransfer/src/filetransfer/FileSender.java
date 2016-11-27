@@ -1,6 +1,7 @@
 package filetransfer;
 
 import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -8,7 +9,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 //Wrapper class for objects needed for sending files
-public class FileSender {
+public class FileSender implements Closeable{
 	private File file;
 	private FileInputStream fis;
 	private BufferedInputStream bis;
@@ -20,7 +21,6 @@ public class FileSender {
 		fis = new FileInputStream(file);
 		bis = new BufferedInputStream(fis);
 		os = sock.getOutputStream();
-		this.sock = sock;
 	}
 
 	public File getFile() {
@@ -39,8 +39,11 @@ public class FileSender {
 		return os;
 	}
 
-	public Socket getSock() {
-		return sock;
+	@Override
+	public void close() throws IOException {
+		fis.close();
+		bis.close();
+		os.close();
 	}
 	
 	
