@@ -15,7 +15,7 @@ public class Client {
 	private String filePath;				// path to file to send/receive
 	private String keyFilePath = "";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
-	private static final int TIMEOUT_TIME = 100;
+	private static final int TIMEOUT_TIME = 5000;	//time until timeout in milliseconds
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -108,16 +108,21 @@ public class Client {
   	    			
   	    			boolean moveToNextPacket = true;
   	    			//loop through sending packets
-  	    			for (int i = 0; i < numPackets; i++){
-  	    				if (moveToNextPacket){
-	  	    				System.out.println("Sending packet #" + i);
+  	    			int i = 0;
+  	    			while (i < numPackets){
+  	    				if (moveToNextPacket){	
 	  	    				packet = prepareNextPacket(fs);
+	  	    				i++;
   	    				}
+  	    				System.out.println("Sending packet #" + i);
   	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
   	    				sendPacket(fs, packet);					//send packet
   	    				sendHashedPacket(fs, packet);			//send hash of that packet for checking integrity
   	    				boolean timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);	//wait to receive signal that packet was successful
-  	    				if ((checkSignal(responseIs)) && !timedOut){			//if packet was received successfully and signal did not time out
+  	    				boolean successfulReceive = checkSignal(responseIs);
+  	    				System.out.println("Timed out: " + timedOut);
+  	    				System.out.println("Successful Receive: " + successfulReceive);
+  	    				if (successfulReceive && !timedOut){			//if packet was received successfully and signal did not time out
   	    					moveToNextPacket = true;
   	    				}
   	    				else {
@@ -147,7 +152,7 @@ public class Client {
 			int curAttempt = 0;
 			while (is.available() < reqBytes && curAttempt < attempts){
 				curAttempt++;
-				Thread.sleep(10);
+				Thread.sleep(1);
 			}
 			if (curAttempt >= attempts){
 				System.out.println("Timed out...");
@@ -171,6 +176,8 @@ public class Client {
   	
   	private void signalPacketReceived(OutputStream os, boolean successful) throws IOException{
   		byte[] result = {(byte)(successful?1:0)};
+  		System.out.println("Result: ");
+  		printByteArray(result);
   		os.write(result,0,1);	//only one byte for boolean
 		os.flush();
   	}
