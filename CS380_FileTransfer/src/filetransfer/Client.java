@@ -23,7 +23,7 @@ public class Client {
 	}
   	
 	//receives the file from the connected client.
-  	public void receiveFile() throws IOException {
+  	public void receiveFile() throws IOException, InterruptedException {
   		FileReceiver fr = null;
   		Socket sock = null;
   		System.out.println("Waiting for connection to receive...");
@@ -38,6 +38,11 @@ public class Client {
   			//loop through receiving packets
   			int i = 0;
   			do {
+  				int attempts = 0;
+  				while (fr.getIs().available() < packetSize && attempts < 1000){
+  					attempts++;
+  					Thread.sleep(10);
+  				}
   				receivedPacket = receiveNextPacket(fr);
   				if (receivedPacket != null){
   					System.out.println("Received packet #" + i);
