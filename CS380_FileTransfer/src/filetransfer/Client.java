@@ -110,11 +110,12 @@ public class Client {
   	    			//loop through sending packets
   	    			int i = 0;
   	    			while (i < numPackets){
+  	    				System.out.println("Sending packet #" + i);
   	    				if (moveToNextPacket){	
 	  	    				packet = prepareNextPacket(fs);
 	  	    				i++;
   	    				}
-  	    				System.out.println("Sending packet #" + i);
+  	    				
   	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
   	    				sendPacket(fs, packet);					//send packet
   	    				sendHashedPacket(fs, packet);			//send hash of that packet for checking integrity
