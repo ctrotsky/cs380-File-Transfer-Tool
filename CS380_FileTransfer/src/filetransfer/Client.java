@@ -15,6 +15,7 @@ public class Client {
 	private String filePath;				// path to file to send/receive
 	private String keyFilePath = "";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
+	private static final int TIMEOUT_TIME = 100;
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -43,13 +44,16 @@ public class Client {
   			//loop through receiving packets
   			int i = 0;
   			do {
-  				waitForReceive(fr.getIs(), 10000, packetSize);	//wait for full packet to arrive
+  				boolean timedOut = waitForReceive(fr.getIs(), TIMEOUT_TIME, packetSize);	//wait for full packet to arrive
+  				if (timedOut == true){
+  					System.out.println("Did not receive full packet!!!!! Timed out");
+  				}
+  				
   				receivedPacket = receiveNextPacket(fr);		
   				if (receivedPacket != null){
   					System.out.println("Received packet #" + i);
   					byte[] hash = receiveNextHash(fr);
   					if (checkIntegrity(receivedPacket, hash)){
-  						//Valid packet. carry on.
   						System.out.println("Packet has integrity");
   						i++;
   						//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
@@ -57,12 +61,9 @@ public class Client {
   						signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
   					}
   					else{
-  						//Invalid packet
   						System.out.println("Packet has does not match given hash!");
   						signalPacketReceived(responseOs, false);	//let sender know packet was not correct, need to resend packet
   					}
-  					//invalid packet handling not fully implemented yet.
-  					//use fr.getIs().mark if correct. use fr.getIs().reset if incorrect. Reset will move back to last mark. Try for number of retries.
   				}
   				else {
   					//notify receiver of successful completion of file transfer
@@ -113,10 +114,10 @@ public class Client {
 	  	    				packet = prepareNextPacket(fs);
   	    				}
   	    				//ROCKY WRITE XOR ENCRYPTION METHOD CALL HERE. Have it modify packet array to be encrypted.
-  	    				sendPacket(fs, packet);				//send packet
-  	    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
-  	    				waitForReceive(responseIs, 1000, 1); //wait to receive signal that packet was successful
-  	    				if (checkSignal(responseIs)){		//if packet was received successfully
+  	    				sendPacket(fs, packet);					//send packet
+  	    				sendHashedPacket(fs, packet);			//send hash of that packet for checking integrity
+  	    				boolean timedOut = waitForReceive(responseIs, TIMEOUT_TIME, 1);	//wait to receive signal that packet was successful
+  	    				if ((checkSignal(responseIs)) && !timedOut){			//if packet was received successfully and signal did not time out
   	    					moveToNextPacket = true;
   	    				}
   	    				else {
@@ -141,13 +142,18 @@ public class Client {
   	
   	
   	//should make this return false if timed out
-  	private void waitForReceive(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
+  	private boolean waitForReceive(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
 			//wait for full packet to arrive before continuing
 			int curAttempt = 0;
 			while (is.available() < reqBytes && curAttempt < attempts){
 				curAttempt++;
 				Thread.sleep(10);
 			}
+			if (curAttempt >= attempts){
+				System.out.println("Timed out...");
+				return true;
+			}
+			return false;
   	}
   	
   	
