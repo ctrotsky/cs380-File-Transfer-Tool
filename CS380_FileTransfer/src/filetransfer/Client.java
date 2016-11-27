@@ -46,10 +46,13 @@ public class Client {
   					if (checkIntegrity(receivedPacket, hash)){
   						//Valid packet. carry on.
   						System.out.println("Packet has integrity");
+  						writePacketToFile(fr, receivedPacket, packetSize);   //should change packetSize to actual length. Last packet will be too long.
+  						//fr.getIs().mark(packetSize);
   					}
   					else{
   						//Invalid packet
   						System.out.println("Packet has does not match given hash!");
+  						//fr.getIs().reset();
   					}
   					//invalid packet handling not fully implemented yet.
   					//use fr.getIs().mark if correct. use fr.getIs().reset if incorrect. Reset will move back to last mark. Try for number of retries.
@@ -75,6 +78,7 @@ public class Client {
   	    ServerSocket servsock = null;
   	    Socket sock = null;
   	    FileSender fs = null;
+  	    byte[] packet;
   	    try {
   	    	servsock = new ServerSocket(socketPort);
   	    	while (true) {	//TODO: only loop until termination of connection from receiver
@@ -91,9 +95,11 @@ public class Client {
   	    			//loop through sending packets
   	    			for (int i = 0; i < numPackets; i++){
   	    				System.out.println("Sending packet #" + i);
-  	    				byte[] packet = sendNextPacket(fs);	//send packet
+  	    				packet = prepareNextPacket(fs);	
+  	    				sendPacket(fs, packet);				//send packet
   	    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
-  	    			}
+  	    			}	
+  	    			
   	    		}
   	    		finally {
   	    			if (fs.getBis() != null) fs.getBis().close();
@@ -105,7 +111,62 @@ public class Client {
   	    finally {
   	    	if (servsock != null) servsock.close();
   	    }
-  	}
+  	}	
+  	
+  	//sends the file with an error in the 2nd packet.
+  	public void sendFileWithError() throws IOException{
+  	    ServerSocket servsock = null;
+  	    Socket sock = null;
+  	    FileSender fs = null;
+  	    byte[] packet;
+  	    try {
+  	    	servsock = new ServerSocket(socketPort);
+  	    	while (true) {	//TODO: only loop until termination of connection from receiver
+  	    		System.out.println("Waiting for connection to send...");
+  	    		try {
+  	    			sock = servsock.accept();
+  	    			System.out.println("Accepted connection: " + sock);
+  	    			// send file
+  	    			fs = new FileSender(filePath, sock);
+  	    			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
+  	    			System.out.println("File Size: " + fs.getFile().length());
+  	    			System.out.println("Number of packets: " + numPackets);
+  	    			
+  	    			System.out.println("Sending packet #1");
+    				packet = prepareNextPacket(fs);	
+    				sendPacket(fs, packet);				//send packet
+    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
+    				
+  	    			System.out.println("Sending packet #2");
+    				packet = prepareNextPacket(fs);	
+    				byte[] errorPacket = Arrays.copyOf(packet, packet.length);
+    				errorPacket[2] = 5;
+    				sendPacket(fs, errorPacket);		//send packet with error
+    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
+  	    			
+  	    			//loop through sending packets
+  	    			for (int i = 2; i < numPackets; i++){
+  	    				System.out.println("Sending packet #" + i);
+  	    				packet = prepareNextPacket(fs);	
+  	    				sendPacket(fs, packet);				//send packet
+  	    				sendHashedPacket(fs, packet);		//send hash of that packet for checking integrity
+  	    			}	
+  	    			
+  	    		}
+  	    		finally {
+  	    			if (fs.getBis() != null) fs.getBis().close();
+  	    			if (fs.getOs() != null) fs.getOs().close();
+  	    			if (sock!=null) sock.close();
+  	    		}
+  	    	}
+  	    }
+  	    finally {
+  	    	if (servsock != null) servsock.close();
+  	    }
+  	}	
+  	
+  	
+  	
   	
   	//returns packet if it was received. else returns null.
   	private byte[] receiveNextPacket(FileReceiver fr) throws IOException{
@@ -114,17 +175,15 @@ public class Client {
   		boolean packetReceived = false;
   		
   		if ((bytesRead = fr.getIs().read(packet)) > 0){
-  			fr.getBos().write(packet, 0, bytesRead);
-  			packetReceived = true;
+  			return packet;
   		}	
- 		
-		fr.getBos().flush();
-		if (packetReceived){
-			return packet;
-		}
-		else {
-			return null;
-		}
+ 			
+		return null;
+  	}
+  	
+  	private void writePacketToFile(FileReceiver fr, byte[] packet, int bytesRead) throws IOException{
+  		fr.getBos().write(packet, 0, bytesRead);
+  		fr.getBos().flush();
   	}
   	
   	//receives and returns the next hash from the connected client
@@ -138,13 +197,22 @@ public class Client {
   	
   	//sends the next packet to the connected client, then returns the packet.
   	//returns packet so it can be used to sendHashedPacket() in sendFile.
-  	private byte[] sendNextPacket(FileSender fs) throws IOException{
-  		byte [] packet  = new byte [packetSize];
-		fs.getBis().read(packet,0,packetSize);
+  	private byte[] sendPacket(FileSender fs, byte[] packet) throws IOException{
 		fs.getOs().write(packet,0,packetSize);
 		fs.getOs().flush();
+		
+		
+		
+		
 		return packet;		
   	}
+  	
+  	private byte[] prepareNextPacket(FileSender fs) throws IOException{
+  		byte [] packet  = new byte [packetSize];
+		fs.getBis().read(packet,0,packetSize);
+		return packet;
+  	}
+   	
   	
   	//hashes the given packet, and sends the hash to the connected client.
   	private void sendHashedPacket(FileSender fs, byte[] packet) throws IOException{
