@@ -66,6 +66,7 @@ public class Client {
   			System.out.println("File Size: " + fs.getFile().length());
   			System.out.println("Number of packets: " + numPackets);
   			
+  			//TODO: validate username/password here
   			sendAllPackets(fs, responseIs, numPackets);
   			terminateSendingConnection(servsock, sock, fs, responseIs);
   			
@@ -117,13 +118,14 @@ public class Client {
 			}
 			
 			receivedPacket = receiveNextPacket(fr);		
+			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
 				byte[] hash = receiveNextChecksum(fr);
 				if (checkIntegrity(receivedPacket, hash) && !timedOut){
 					System.out.println("Packet has integrity");
 					i++;
-					//ROCKY WRITE XOR DECRYPTION METHOD CALL HERE. Have it modify receivedPacket array to be decrypted.
+					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
 					signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
 				}
@@ -151,13 +153,14 @@ public class Client {
 			System.out.println("Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
+				//TODO: encrypt packet here
 				i++;
 			}	
-		sendPacket(fs, packet);				
-		sendChecksum(fs, packet);
-		timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);		//wait until 1 byte arrives (signal that last packet was successful)
-		successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
-		if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
+			sendPacket(fs, packet);				
+			sendChecksum(fs, packet);
+			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
+			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
+			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
 				moveToNextPacket = true;
 			}
 			else {
