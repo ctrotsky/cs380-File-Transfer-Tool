@@ -25,22 +25,22 @@ public class Driver {
 //		receiveClient.receiveFile();
 //		
 		ThreadRunner sendClient = new ThreadRunner();
-		sendClient.setFilePath("C:/Users/Colin/Documents/FileTransfer/Client1/SendFile.txt");
+		sendClient.setFilePath("C:/Users/Colin/Documents/FileTransfer/Client1/Jet1.mp4");
 		sendClient.setKeyFile("C:/Users/Colin/Documents/FileTransfer/Client1/keyfile.txt");
-		sendClient.setTargetIP("134.71.204.180");
+		sendClient.setTargetIP("10.110.123.221");
 		sendClient.setSocketPort(13267);
 		sendClient.setPacketSize(40);
 		sendClient.setToSend();
-		//sendClient.setAsciiArmored(true);
+		sendClient.setAsciiArmored(true);
 		
 		ThreadRunner receiveClient = new ThreadRunner();
-		receiveClient.setFilePath("C:/Users/Colin/Documents/FileTransfer/Client2/ReceiveFile.txt");
+		receiveClient.setFilePath("C:/Users/Colin/Documents/FileTransfer/Client2/Jet1.mp4");
 		receiveClient.setKeyFile("C:/Users/Colin/Documents/FileTransfer/Client2/keyfile.txt");
-		receiveClient.setTargetIP("134.71.204.180");
+		receiveClient.setTargetIP("10.110.123.221");
 		receiveClient.setSocketPort(13267);
 		receiveClient.setPacketSize(40);
 		receiveClient.setToReceive();
-		//receiveClient.setAsciiArmored(true);
+		receiveClient.setAsciiArmored(true);
 		
 		Thread sendThread = new Thread(sendClient);
 		Thread receiveThread = new Thread(receiveClient);

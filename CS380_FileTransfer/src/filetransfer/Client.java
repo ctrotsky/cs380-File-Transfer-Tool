@@ -143,7 +143,7 @@ public class Client {
 					System.out.println("PACKET RECEIVED ASCII:");
 					printByteArray(receivedPacket);
 					
-					receivedPacket = asciiDecode(receivedPacket);
+					receivedPacket = myAsciiDecode(receivedPacket);
 					
 					System.out.println("PACKET RECEIVED normal:");
 					printByteArray(receivedPacket);
@@ -189,10 +189,13 @@ public class Client {
 			
 			if (asciiArmor){
 				
-				System.out.println("PACKET BEFORE ASCII (Send):");
-				printByteArray(packet);
+//				System.out.println("PACKET BEFORE ASCII (Send):");
+//				printByteArray(packet);
 				
-				packet= asciiEncode2(packet);
+				System.out.println("Default Encode:");
+				printByteArray(Base64.getEncoder().encode(packet));
+				
+				packet= myAsciiEncode(packet);
 				
 				System.out.println("PACKET AFTER ASCII (Send):");
 				printByteArray(packet);
@@ -510,7 +513,7 @@ public class Client {
 		return Base64.getEncoder().encode(bArray);
 	}
 	
-	public byte[] myAsciiDecoder(byte[] bArray){
+	public byte[] myAsciiDecode(byte[] bArray){
 		return Base64.getDecoder().decode(bArray);
 	}
 	
