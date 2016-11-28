@@ -10,14 +10,15 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Random;
 
 public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
-	private String keyFilePath = "E:/awe.cpp";		// not yet implemented. Will be used to XOR encrypt send packets.
+	private String keyFilePath = "E:/awe.txt";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
-	private static final int TIMEOUT_TIME = 5000;	//time until timeout in milliseconds
+	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -119,13 +120,14 @@ public class Client {
 				System.out.println("Did not receive full packet. Timed out");
 			}
 			
-			receivedPacket = XoR(receiveNextPacket(fr),i);		
+			receivedPacket = receiveNextPacket(fr);		
 			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
 				byte[] hash = receiveNextChecksum(fr);
 				if (checkIntegrity(receivedPacket, hash) && !timedOut){
 					System.out.println("Packet has integrity");
+					receivedPacket = XoR(receivedPacket,i);	
 					i++;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
@@ -155,12 +157,13 @@ public class Client {
 			System.out.println("Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
-				//TODO: encrypt packet here
+				packet=XoR(packet,i); //TODO: encrypt packet here
 				i++;
 			}	
+						
+			sendPacket(fs, packet);		
 			sendChecksum(fs, packet);
-			packet=XoR(packet,i);
-			sendPacket(fs, packet);				
+
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
 			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
@@ -321,18 +324,17 @@ public class Client {
     {
         byte[] c=new byte[packetSize];
         byte[] b= key(keyFilePath);
-        int eof=packetSize*packetNumber;
-        int j=0;
+        int eof= 3 ;// packetSize*packetNumber;
+        
 
         for(int i=0;i<a.length;i++)
         {
-            if(j==eof)
-                j=0 ;
+           
 
-            c[i] = (byte) (a[i] ^ b[j]);
+            c[i] = (byte) (a[i] ^ b[i%eof]);
 
 
-            j++;
+         
         }
 
 
@@ -342,12 +344,13 @@ public class Client {
   	
 	  	private byte[] key(String fn) throws IOException
 	  	{
-	  		KeyFile kf= new KeyFile(fn);
-	  		byte[] kbyte= new byte[(int) kf.getFile().length()];
+	  		//KeyFile kf= new KeyFile(fn);
+	  		byte[] kbyte= {'A','B','C'};
 	  		
-	  		kf.getFis().read(kbyte);
+	  		
+	  		//kf.getFis().read(kbyte);
 	  	
-	  		kf.close();
+	  		//kf.close();
 	  		
 	  		return kbyte;
 	  	}
