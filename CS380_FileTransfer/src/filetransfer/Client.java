@@ -19,7 +19,6 @@ public class Client {
 	private String keyFilePath = "E:/awe.txt";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
-	private byte[] keyBytes;
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -40,7 +39,6 @@ public class Client {
 	    	sock = new Socket(targetIP, socketPort);
 	    	fr = new FileReceiver(filePath, sock);
 	    	responseOs = sock.getOutputStream();
-	    	readKeyBytes(keyFilePath);
 	    	
 	    	//TODO: validate username/password here
 	    	receiveAllPackets(fr, responseOs);
@@ -66,7 +64,6 @@ public class Client {
   	    	sock = establishConnection(servsock, socketPort);
   	    	fs = new FileSender(filePath, sock);
   			responseIs = sock.getInputStream();
-  			readKeyBytes(keyFilePath);
   			
   			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
   			System.out.println("File Size: " + fs.getFile().length());
@@ -167,6 +164,7 @@ public class Client {
 			sendPacket(fs, packet);		
 			sendChecksum(fs, packet);
 
+			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
 			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
 			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
@@ -182,17 +180,17 @@ public class Client {
   	
   	//should make this return false if timed out
   	private boolean waitForAvailable(InputStream is, int attempts, int reqBytes) throws IOException, InterruptedException{
-		//wait for full packet to arrive before continuing
-		int curAttempt = 0;
-		while (is.available() < reqBytes && curAttempt < attempts){
-			curAttempt++;
-			Thread.sleep(1);
-		}
-		if (curAttempt >= attempts){
-			System.out.println("Timed out...");
-			return true;
-		}
-		return false;
+			//wait for full packet to arrive before continuing
+			int curAttempt = 0;
+			while (is.available() < reqBytes && curAttempt < attempts){
+				curAttempt++;
+				Thread.sleep(1);
+			}
+			if (curAttempt >= attempts){
+				System.out.println("Timed out...");
+				return true;
+			}
+			return false;
   	}
   	
   	
@@ -324,26 +322,39 @@ public class Client {
   	
   	private byte[] XoR(byte[] a, int packetNumber) throws IOException
     {
-        byte[] c= new byte[packetSize];
-        byte[] b= keyBytes;
-        int eof= 3 ;// packetSize*packetNumber;        
+        byte[] c=new byte[packetSize];
+        byte[] b= key(keyFilePath);
+        int eof= 3 ;// packetSize*packetNumber;
+        
 
         for(int i=0;i<a.length;i++)
         {
+           
+
             c[i] = (byte) (a[i] ^ b[i%eof]);
+
+
+         
         }
 
-        return c;
+
+      return c;
 
     }
-
-	private void readKeyBytes(String fileName) throws IOException
-	{
-  		KeyFile kf= new KeyFile(fileName);
-  		keyBytes = new byte[(int) kf.getFile().length()];
-  		kf.getFis().read(keyBytes, 0, (int)(kf.getFile().length()));
+  	
+	  	private byte[] key(String fn) throws IOException
+	  	{
+	  		//KeyFile kf= new KeyFile(fn);
+	  		byte[] kbyte= {'A','B','C'};
+	  		
+	  		
+	  		//kf.getFis().read(kbyte);
+	  	
+	  		//kf.close();
+	  		
+	  		return kbyte;
+	  	}
   	}
-}
   	//TODO: (in no particular order)
   	//1. Send packet size to receiver before sending packets. Don't rely on receiver to hardcode correct packet size.
   	//2. XOR encrypt sent packets with key file
