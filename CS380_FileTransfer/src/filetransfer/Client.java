@@ -46,7 +46,7 @@ public class Client {
 	    	//TODO: validate username/password here
 	    	int numPackets = receiveNumPackets(fr);
 	    	System.out.println("Num of packets to expect:" +  numPackets);
-	    	receiveAllPackets(fr, responseOs);
+	    	receiveAllPackets(fr, responseOs, numPackets);
 	    	terminateReceivingConnection(sock, fr, responseOs);
   	  	}
   	    catch (IOException e) {
@@ -120,12 +120,12 @@ public class Client {
   	}
   	
   	
-  	private void receiveAllPackets(FileReceiver fr, OutputStream responseOs) throws IOException, InterruptedException{
+  	private void receiveAllPackets(FileReceiver fr, OutputStream responseOs, int numPackets) throws IOException, InterruptedException{
   		//loop through receiving packets
   		byte[] receivedPacket;
   		
 		int i = 0;
-		do {
+		while (i < numPackets){
 			boolean timedOut = waitForAvailable(fr.getIs(), TIMEOUT_TIME, packetSize);	//wait for full packet to arrive and be available
 			if (timedOut == true){
 				System.out.println("Did not receive full packet. Timed out");
@@ -149,11 +149,8 @@ public class Client {
 					sendResponseSignal(responseOs, false);	//let sender know packet was not correct, need to resend packet
 				}
 			}
-			else {
-				//notify receiver of successful completion of file transfer
-				//notify receiver to terminate connection
-			}
-		} while(receivedPacket != null);
+		}
+		System.out.println("Finished receiving file");
   	}
   	
   	private void sendAllPackets(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
