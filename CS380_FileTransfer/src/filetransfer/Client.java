@@ -18,7 +18,7 @@ public class Client {
 	private String filePath;				// path to file to send/receive
 	private String keyFilePath = "E:/awe.txt";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
-	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
+	private static final int TIMEOUT_TIME = 5000;	//time until timeout in milliseconds
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -124,10 +124,11 @@ public class Client {
 			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
+				receivedPacket = XoR(receivedPacket,i);	
 				byte[] hash = receiveNextChecksum(fr);
 				if (checkIntegrity(receivedPacket, hash) && !timedOut){
 					System.out.println("Packet has integrity");
-					receivedPacket = XoR(receivedPacket,i);	
+					
 					i++;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
@@ -157,12 +158,13 @@ public class Client {
 			System.out.println("Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
-				packet=XoR(packet,i); //TODO: encrypt packet here
+				 //TODO: encrypt packet here
 				i++;
 			}	
 						
 			sendPacket(fs, packet);		
 			sendChecksum(fs, packet);
+			packet=XoR(packet,i);
 
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
