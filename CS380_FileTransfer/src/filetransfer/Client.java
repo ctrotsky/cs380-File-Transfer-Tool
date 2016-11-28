@@ -19,6 +19,7 @@ public class Client {
 	private String keyFilePath = "E:/awe.txt";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
+	private byte[] keyBytes;
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -30,12 +31,14 @@ public class Client {
 	}
   	
   	public void receiveFile(){
+  		
   	    Socket sock = null;
   	    FileReceiver fr = null;
   	    
   	    OutputStream responseOs = null;
   	    
   	    try {
+  	    	readKeyBytes(keyFilePath);
 	    	sock = new Socket(targetIP, socketPort);
 	    	fr = new FileReceiver(filePath, sock);
 	    	responseOs = sock.getOutputStream();
@@ -61,6 +64,7 @@ public class Client {
   	    InputStream responseIs = null;
   	    
   	    try {
+  	    	readKeyBytes(keyFilePath);
   	    	sock = establishConnection(servsock, socketPort);
   	    	fs = new FileSender(filePath, sock);
   			responseIs = sock.getInputStream();
@@ -322,39 +326,26 @@ public class Client {
   	
   	private byte[] XoR(byte[] a, int packetNumber) throws IOException
     {
-        byte[] c=new byte[packetSize];
-        byte[] b= key(keyFilePath);
-        int eof= 3 ;// packetSize*packetNumber;
-        
+        byte[] c= new byte[packetSize];
+        byte[] b= keyBytes;
+        int eof= 3 ;// packetSize*packetNumber;        
 
         for(int i=0;i<a.length;i++)
         {
-           
-
             c[i] = (byte) (a[i] ^ b[i%eof]);
-
-
-         
         }
 
-
-      return c;
+        return c;
 
     }
-  	
-	  	private byte[] key(String fn) throws IOException
-	  	{
-	  		//KeyFile kf= new KeyFile(fn);
-	  		byte[] kbyte= {'A','B','C'};
-	  		
-	  		
-	  		//kf.getFis().read(kbyte);
-	  	
-	  		//kf.close();
-	  		
-	  		return kbyte;
-	  	}
+
+	private void readKeyBytes(String fileName) throws IOException
+	{
+  		KeyFile kf= new KeyFile(fileName);
+  		keyBytes = new byte[(int) kf.getFile().length()];
+  		kf.getFis().read(keyBytes, 0, (int)(kf.getFile().length()));
   	}
+}
   	//TODO: (in no particular order)
   	//1. Send packet size to receiver before sending packets. Don't rely on receiver to hardcode correct packet size.
   	//2. XOR encrypt sent packets with key file
