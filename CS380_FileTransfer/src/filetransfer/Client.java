@@ -44,6 +44,8 @@ public class Client {
 	    	responseOs = sock.getOutputStream();
 	    	
 	    	//TODO: validate username/password here
+	    	int numPackets = receiveNumPackets(fr);
+	    	System.out.println("Num of packets to expect:" +  numPackets);
 	    	receiveAllPackets(fr, responseOs);
 	    	terminateReceivingConnection(sock, fr, responseOs);
   	  	}
@@ -74,6 +76,8 @@ public class Client {
   			System.out.println("Number of packets: " + numPackets);
   			
   			//TODO: validate username/password here
+  			
+  			sendNumPackets(fs, numPackets);
   			sendAllPackets(fs, responseIs, numPackets);
   			terminateSendingConnection(servsock, sock, fs, responseIs);
   			
@@ -138,11 +142,11 @@ public class Client {
 					i++;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
-					signalPacketReceived(responseOs, true);		//let sender know packet was successfully received
+					sendResponseSignal(responseOs, true);		//let sender know packet was successfully received
 				}
 				else{
 					System.out.println("Packet needs to be resent");
-					signalPacketReceived(responseOs, false);	//let sender know packet was not correct, need to resend packet
+					sendResponseSignal(responseOs, false);	//let sender know packet was not correct, need to resend packet
 				}
 			}
 			else {
@@ -173,7 +177,7 @@ public class Client {
 
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
-			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
+			successfulReceive = checkResponseSignal(responseIs);				//resolve that byte to a boolean
 			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
 				moveToNextPacket = true;
 			}
@@ -213,7 +217,7 @@ public class Client {
 		return null;
   	}
   	
-  	private void signalPacketReceived(OutputStream os, boolean successful) throws IOException{
+  	private void sendResponseSignal(OutputStream os, boolean successful) throws IOException{
   		byte[] result = new byte[1];
   		if (successful){
   			result[0] = 1;
@@ -225,7 +229,7 @@ public class Client {
 		os.flush();
   	}
   	
-  	private boolean checkSignal(InputStream is) throws IOException{
+  	private boolean checkResponseSignal(InputStream is) throws IOException{
   		byte[] result = new byte [1];
   		is.read(result);
   		if (result[0] == 0){
@@ -274,6 +278,24 @@ public class Client {
 		fs.getOs().flush();
 		
   	}
+  	
+  	//sends the number of packets from the sender to the receiver
+  	private void sendNumPackets(FileSender fs, int numPackets) throws IOException{	
+  		byte[] numPacketsBytes = ByteBuffer.allocate(4).putInt(numPackets).array();	
+  		
+  		fs.getOs().write(numPacketsBytes,0,numPacketsBytes.length);
+		fs.getOs().flush();
+  	}
+  	
+  	//receives byte array of number of packets and returns int
+  	private int receiveNumPackets(FileReceiver fr) throws IOException{	
+  		byte [] numPacketsBytes  = new byte [4];
+  	
+  		fr.getIs().read(numPacketsBytes);
+
+  		return (ByteBuffer.wrap(numPacketsBytes).getInt());
+  	}
+  	
   	
   	//returns a byte array of the hash of the given packet.
   	private byte[] hashPacketBytes(byte[] packet){
