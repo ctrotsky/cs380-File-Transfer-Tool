@@ -13,3 +13,4 @@ hs_err_pid*
 CS380_FileTransfer/.classpath
 CS380_FileTransfer/.project
 CS380_FileTransfer/.settings/org.eclipse.jdt.core.prefs
+/bin/
