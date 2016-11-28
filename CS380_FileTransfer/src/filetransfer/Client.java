@@ -15,7 +15,7 @@ public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
-	private String keyFilePath = "";		// not yet implemented. Will be used to XOR encrypt send packets.
+	private String keyFilePath = "E:/awe.cpp";		// not yet implemented. Will be used to XOR encrypt send packets.
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 5000;	//time until timeout in milliseconds
 	
@@ -119,7 +119,7 @@ public class Client {
 				System.out.println("Did not receive full packet. Timed out");
 			}
 			
-			receivedPacket = receiveNextPacket(fr);		
+			receivedPacket = XoR(receiveNextPacket(fr),i);		
 			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
@@ -158,8 +158,10 @@ public class Client {
 				//TODO: encrypt packet here
 				i++;
 			}	
-			sendPacket(fs, packet);				
 			sendChecksum(fs, packet);
+			packet=XoR(packet,i);
+			sendPacket(fs, packet);				
+			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
 			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
 			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
@@ -315,16 +317,17 @@ public class Client {
   		System.out.println("=================");
   	}
   	
-  	private byte[] XoR(byte[] a, byte[] b)
+  	private byte[] XoR(byte[] a, int packetNumber) throws IOException
     {
-        byte[] c=new byte[a.length];
-        int count= b.length;
+        byte[] c=new byte[packetSize];
+        byte[] b= key(keyFilePath);
+        int eof=packetSize*packetNumber;
         int j=0;
 
         for(int i=0;i<a.length;i++)
         {
-            if(j==count)
-                j=0;
+            if(j==eof)
+                j=0 ;
 
             c[i] = (byte) (a[i] ^ b[j]);
 
@@ -337,7 +340,7 @@ public class Client {
 
     }
   	
-	  	private byte[] key(String fn)
+	  	private byte[] key(String fn) throws IOException
 	  	{
 	  		KeyFile kf= new KeyFile(fn);
 	  		byte[] kbyte= new byte[(int) kf.getFile().length()];
@@ -361,4 +364,4 @@ public class Client {
   	//8. Improve integrity hashing algorithm?
   	//9. Last sent packet should cut off after last used byte. Currently will send with empty bytes if full packet size isn't used.
   	//10. make waitForReceived return false if timed out. Use this to retry send if timed out
-}
+
