@@ -168,7 +168,7 @@ public class Client {
 				packet = prepareNextPacket(fs);
 				checksum = checksumPacketBytes(packet);
 				packet=XoR(packet,i); //encrypt packet
-				packet=XoR(packet,i); //encrypt checksum
+				checksum=XoR(checksum,i); //encrypt checksum
 				i++;
 			}	
 						
