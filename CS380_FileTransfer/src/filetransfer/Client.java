@@ -88,9 +88,6 @@ public class Client {
   	    catch (InterruptedException e) {
 			System.err.println("InterruptedException: " + e.getMessage());
 		}
-  	    finally {
-  	    	
-  	    }
   	}	
   	
   	//Establishes connection. Returns Socket that is connected.
@@ -135,10 +132,11 @@ public class Client {
 			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
-				byte[] hash = receiveNextChecksum(fr);
-				if (checkIntegrity(receivedPacket, hash) && !timedOut){
+				byte[] checksum = receiveNextChecksum(fr);
+				checksum = XoR(checksum, i);
+				receivedPacket = XoR(receivedPacket,i);	
+				if (checkIntegrity(receivedPacket, checksum) && !timedOut){
 					System.out.println("Packet has integrity");
-					receivedPacket = XoR(receivedPacket,i);	
 					i++;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
@@ -158,6 +156,7 @@ public class Client {
 		boolean timedOut = false;
 		boolean successfulReceive;
 		byte[] packet = null;
+		byte[] checksum = null;
 		
 		//loop through sending each packet
 		int i = 0;
@@ -165,12 +164,14 @@ public class Client {
 			System.out.println("Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
-				packet=XoR(packet,i); //TODO: encrypt packet here
+				packet=XoR(packet,i); //encrypt packet
+				checksum = checksumPacketBytes(packet);
+				packet=XoR(packet,i); //encrypt checksum
 				i++;
 			}	
 						
 			sendPacket(fs, packet);		
-			sendChecksum(fs, packet);
+			sendChecksum(fs, checksum);
 
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
@@ -265,15 +266,10 @@ public class Client {
   	}
    	
   	
-  	//hashes the given packet, and sends the hash to the connected client.
-  	private void sendChecksum(FileSender fs, byte[] packet) throws IOException{
-  		byte[] hashBytes = hashPacketBytes(packet);
-  		
-  		
-		fs.getOs().write(hashBytes,0,hashBytes.length);
-		
-		fs.getOs().flush();
-		
+  	//sends the hash to the connected client.
+  	private void sendChecksum(FileSender fs, byte[] checksum) throws IOException{
+		fs.getOs().write(checksum,0,checksum.length);		
+		fs.getOs().flush();	
   	}
   	
   	//sends the number of packets from the sender to the receiver
@@ -295,7 +291,7 @@ public class Client {
   	
   	
   	//returns a byte array of the hash of the given packet.
-  	private byte[] hashPacketBytes(byte[] packet){
+  	private byte[] checksumPacketBytes(byte[] packet){
   		int hash = 0;
   		
   		for (byte b : packet){
@@ -308,7 +304,7 @@ public class Client {
   	
   	//compares the received hash to the calculated hash of the received packet. Returns true if the packet has integrity. Returns false if the packet has been tampered with.
   	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){	
-  		byte[] hash = hashPacketBytes(receivedPacket);
+  		byte[] hash = checksumPacketBytes(receivedPacket);
 
   		if (Arrays.equals(hash, receivedHash)){
   			return true;
