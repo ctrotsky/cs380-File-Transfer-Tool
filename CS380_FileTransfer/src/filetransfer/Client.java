@@ -16,7 +16,7 @@ public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
-	private String keyFilePath = "E:/awe.txt";		// not yet implemented. Will be used to XOR encrypt send packets.
+	private String keyFilePath = "E:/Documents/SocketTesting/FileClient1/keyfile.txt";
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
 	private byte[] keyBytes;
@@ -84,6 +84,9 @@ public class Client {
   	    catch (InterruptedException e) {
 			System.err.println("InterruptedException: " + e.getMessage());
 		}
+  	    finally {
+  	    	
+  	    }
   	}	
   	
   	//Establishes connection. Returns Socket that is connected.
@@ -342,6 +345,7 @@ public class Client {
 	private void readKeyBytes(String fileName) throws IOException
 	{
   		KeyFile kf= new KeyFile(fileName);
+  		System.out.println("Key File size:" + kf.getFile().length());
   		keyBytes = new byte[(int) kf.getFile().length()];
   		kf.getFis().read(keyBytes, 0, (int)(kf.getFile().length()));
   	}

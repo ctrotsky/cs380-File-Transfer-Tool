@@ -20,13 +20,11 @@ import java.net.Socket;
 		private FileInputStream fis;
 		private BufferedInputStream bis;
 		private OutputStream os;
-		private Socket sock;
 
 		public KeyFile(String filePath) throws IOException{
 			file = new File(filePath);
 			fis = new FileInputStream(file);
 			bis = new BufferedInputStream(fis);
-			os = sock.getOutputStream();
 		}
 
 		public File getFile() {
