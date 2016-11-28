@@ -135,7 +135,7 @@ public class Client {
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
 				byte[] checksum = receiveNextChecksum(fr);
-				if(true) //add ascii var
+				
 				receivedPacket= asciiDecode(receivedPacket);
 				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
 				checksum = XoR(checksum, i);			//decrypt checksum
@@ -174,7 +174,7 @@ public class Client {
 				checksum=XoR(checksum,i); //encrypt checksum
 				i++;
 			}	
-			if(true)  // add ascii var
+			
 				packet= asciiEncode2(packet);			
 			sendPacket(fs, packet);		
 			sendChecksum(fs, checksum);
@@ -374,7 +374,7 @@ public class Client {
   		System.out.println("Key File size:" + kf.getFile().length());
   		keyBytes = new byte[(int) kf.getFile().length()];
   		kf.getFis().read(keyBytes, 0, (int)(kf.getFile().length()));
-  		kf.close();
+
   	}
 	public static byte[] asciiEncode2(byte[] bArray) throws IOException{
         String dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwqyx0123456789+/";
@@ -402,9 +402,9 @@ public class Client {
 	  				temp = "0" + temp;
 	  			s += temp;
   			}
-  			if (s.length() == 24)
-  				System.out.println("Number in bits:" + s);
-  			else if(s.length() == 8)
+  			//if (s.length() == 24)
+  				//System.out.println("Number in bits:" + s);
+  			 if(s.length() == 8)
   				s += "0000000000000000";
   			else if(s.length() == 16)
   			  	s += "00000000";
