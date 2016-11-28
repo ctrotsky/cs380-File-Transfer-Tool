@@ -123,12 +123,11 @@ public class Client {
 			receivedPacket = receiveNextPacket(fr);		
 			
 			if (receivedPacket != null){
-				System.out.println("Received packet #" + i);
-				receivedPacket = XoR(receivedPacket,i);	
+				System.out.println("Received packet #" + i);	
 				byte[] hash = receiveNextChecksum(fr);
 				if (checkIntegrity(receivedPacket, hash) && !timedOut){
 					System.out.println("Packet has integrity");
-					
+					receivedPacket = XoR(receivedPacket,i);
 					i++;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
@@ -162,10 +161,10 @@ public class Client {
 				i++;
 			}	
 						
-			sendPacket(fs, packet);		
+				
 			sendChecksum(fs, packet);
 			packet=XoR(packet,i);
-
+			sendPacket(fs, packet);	
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
 			successfulReceive = checkSignal(responseIs);				//resolve that byte to a boolean
