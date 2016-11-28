@@ -133,8 +133,10 @@ public class Client {
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
 				byte[] checksum = receiveNextChecksum(fr);
-				checksum = XoR(checksum, i);
-				receivedPacket = XoR(receivedPacket,i);	
+				
+				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
+				checksum = XoR(checksum, i);			//decrypt checksum
+				
 				if (checkIntegrity(receivedPacket, checksum) && !timedOut){
 					System.out.println("Packet has integrity");
 					i++;
@@ -164,8 +166,8 @@ public class Client {
 			System.out.println("Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
-				packet=XoR(packet,i); //encrypt packet
 				checksum = checksumPacketBytes(packet);
+				packet=XoR(packet,i); //encrypt packet
 				packet=XoR(packet,i); //encrypt checksum
 				i++;
 			}	
@@ -303,8 +305,8 @@ public class Client {
   	}
   	
   	//compares the received hash to the calculated hash of the received packet. Returns true if the packet has integrity. Returns false if the packet has been tampered with.
-  	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){	
-  		byte[] hash = checksumPacketBytes(receivedPacket);
+  	private boolean checkIntegrity(byte[] receivedPacket, byte[] receivedHash){		
+  		byte[] hash = checksumPacketBytes(receivedPacket); 		
 
   		if (Arrays.equals(hash, receivedHash)){
   			return true;
@@ -344,7 +346,7 @@ public class Client {
   	
   	private byte[] XoR(byte[] a, int packetNumber) throws IOException
     {
-        byte[] c= new byte[packetSize];
+        byte[] c= new byte[a.length];
         byte[] b= keyBytes;
         int eof= 3 ;// packetSize*packetNumber;        
 
