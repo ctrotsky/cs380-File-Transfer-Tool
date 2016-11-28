@@ -5,11 +5,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Random;
 
 public class Client {
@@ -20,6 +22,7 @@ public class Client {
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
 	private byte[] keyBytes;
+	private boolean asciiArmor;
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
@@ -28,6 +31,7 @@ public class Client {
 		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
 		packetSize = 3;	
 		keyFilePath="";// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
+		asciiArmor = false;
 	}
   	
   	public void receiveFile(){
@@ -44,7 +48,7 @@ public class Client {
 	    	responseOs = sock.getOutputStream();
 	    	
 	    	//TODO: validate username/password here
-	    	int numPackets = receiveNumPackets(fr);
+	    	int numPackets = receiveInt(fr);	//receive the number of packets to expect
 	    	System.out.println("Num of packets to expect:" +  numPackets);
 	    	receiveAllPackets(fr, responseOs, numPackets);
 	    	terminateReceivingConnection(sock, fr, responseOs);
@@ -77,7 +81,7 @@ public class Client {
   			
   			//TODO: validate username/password here
   			
-  			sendNumPackets(fs, numPackets);
+  			sendInt(fs, numPackets);	//tell receiver how many packets to expect
   			sendAllPackets(fs, responseIs, numPackets);
   			terminateSendingConnection(servsock, sock, fs, responseIs);
   			
@@ -109,7 +113,7 @@ public class Client {
 			if (responseStream != null) responseStream.close();
   	}
   	
-  //Terminates connection by closing all streams.
+  	//Terminates connection by closing all streams.
   	private void terminateReceivingConnection(Socket sock, Closeable filehandler, Closeable responseStream) throws IOException{
 	    	if (filehandler != null) filehandler.close();
 			if (sock!=null) sock.close();
@@ -128,11 +132,22 @@ public class Client {
 				System.out.println("Did not receive full packet. Timed out");
 			}
 			
-			receivedPacket = receiveNextPacket(fr);		
+			int nextPacketSize = receiveInt(fr);
+			receivedPacket = receiveNextPacket(fr, nextPacketSize);		
 			
 			if (receivedPacket != null){
 				System.out.println("Received packet #" + i);
 				byte[] checksum = receiveNextChecksum(fr);
+							
+				if (asciiArmor){
+					System.out.println("PACKET RECEIVED ASCII:");
+					printByteArray(receivedPacket);
+					
+					receivedPacket = asciiDecode(receivedPacket);
+					
+					System.out.println("PACKET RECEIVED normal:");
+					printByteArray(receivedPacket);
+				}
 				
 				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
 				checksum = XoR(checksum, i);			//decrypt checksum
@@ -170,8 +185,20 @@ public class Client {
 				packet=XoR(packet,i); //encrypt packet
 				checksum=XoR(checksum,i); //encrypt checksum
 				i++;
-			}	
+			}		
+			
+			if (asciiArmor){
+				
+				System.out.println("PACKET BEFORE ASCII (Send):");
+				printByteArray(packet);
+				
+				packet= asciiEncode2(packet);
+				
+				System.out.println("PACKET AFTER ASCII (Send):");
+				printByteArray(packet);
+			}
 						
+			sendInt(fs, packet.length);
 			sendPacket(fs, packet);		
 			sendChecksum(fs, checksum);
 
@@ -206,15 +233,14 @@ public class Client {
   	
   	
   	//returns packet if it was received. else returns null.
-  	private byte[] receiveNextPacket(FileReceiver fr) throws IOException{
-  		byte [] packet  = new byte [packetSize];
+  	private byte[] receiveNextPacket(FileReceiver fr, int expectedSize) throws IOException{
+		byte [] packet  = new byte [expectedSize];
   		int bytesRead;
   		
   		if ((bytesRead = fr.getIs().read(packet)) > 0){
   			return packet;
   		}	
- 			
-		return null;
+  		return null;
   	}
   	
   	private void sendResponseSignal(OutputStream os, boolean successful) throws IOException{
@@ -255,7 +281,8 @@ public class Client {
   	//sends the next packet to the connected client, then returns the packet.
   	//returns packet so it can be used to sendHashedPacket() in sendFile.
   	private byte[] sendPacket(FileSender fs, byte[] packet) throws IOException{
-		fs.getOs().write(packet,0,packetSize);
+  		
+  		fs.getOs().write(packet,0,packet.length);
 		fs.getOs().flush();
 		
 		return packet;		
@@ -275,7 +302,7 @@ public class Client {
   	}
   	
   	//sends the number of packets from the sender to the receiver
-  	private void sendNumPackets(FileSender fs, int numPackets) throws IOException{	
+  	private void sendInt(FileSender fs, int numPackets) throws IOException{	
   		byte[] numPacketsBytes = ByteBuffer.allocate(4).putInt(numPackets).array();	
   		
   		fs.getOs().write(numPacketsBytes,0,numPacketsBytes.length);
@@ -283,7 +310,7 @@ public class Client {
   	}
   	
   	//receives byte array of number of packets and returns int
-  	private int receiveNumPackets(FileReceiver fr) throws IOException{	
+  	private int receiveInt(FileReceiver fr) throws IOException{	
   		byte [] numPacketsBytes  = new byte [4];
   	
   		fr.getIs().read(numPacketsBytes);
@@ -334,6 +361,10 @@ public class Client {
   		this.packetSize = packetSize;
   	}
   	
+  	public void setAsciiArmored(boolean asciiArmor){
+  		this.asciiArmor = asciiArmor;
+  	}
+  	
   	
   	//For testing only. Delete when done.
   	private void printByteArray(byte[] bytes){
@@ -349,12 +380,14 @@ public class Client {
         byte[] c= new byte[a.length];
         byte[] b= keyBytes;
         int eof= keyBytes.length;
-        int j=packetSize*packetNumber;
+        
+       int j= packetNumber*packetSize;
 
         for(int i=0;i<a.length;i++)
         {
         	if(j>=eof)
         		j=j%eof;
+        	
             c[i] = (byte) (a[i] ^ b[j]);
         }
 
@@ -368,7 +401,119 @@ public class Client {
   		System.out.println("Key File size:" + kf.getFile().length());
   		keyBytes = new byte[(int) kf.getFile().length()];
   		kf.getFis().read(keyBytes, 0, (int)(kf.getFile().length()));
+
   	}
+	public static byte[] asciiEncode2(byte[] bArray) throws IOException{
+        String dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwqyx0123456789+/";
+        String asciiData = "";
+        String[] ascii = new String[4];			//For breaking 3 bytes into 4 sets of 6 bits
+        byte[] armouredBArray;
+        
+        int len = bArray.length;
+		
+  		for(int i = 0; i < len; i+=3){
+  			String s = "";
+  			String temp = Integer.toBinaryString(0xFF & bArray[i]);
+  			while (temp.length() < 8)
+  				temp = "0" + temp;
+  			s += temp;
+  			if(i+1  < len){
+  				temp = Integer.toBinaryString(0xFF & bArray[i+1]);
+	  			while (temp.length() < 8)
+	  				temp = "0" + temp;
+	  			s += temp;
+  			}
+  			if(i+2  < len){
+  				temp = Integer.toBinaryString(0xFF & bArray[i+2]);
+	  			while (temp.length() < 8)
+	  				temp = "0" + temp;
+	  			s += temp;
+  			}
+  			//if (s.length() == 24)
+  				//System.out.println("Number in bits:" + s);
+  			 if(s.length() == 8)
+  				s += "0000000000000000";
+  			else if(s.length() == 16)
+  			  	s += "00000000";
+  			  	
+  	        int y = 0;
+  	        int counter = 0;
+  	        while (y < ascii.length) {
+  	        	String a = "";
+  	        	while (counter < s.length() ){
+  	        		a += s.charAt(counter);
+  	        		counter++;
+  	        		if (counter % 6 == 0)
+  	        			break;
+              }
+              ascii[y] = a;
+              y++;
+          }
+  	        
+  	        
+          //System.out.println("\nGroup in 6 bits:");
+          //for(int j = 0; j < ascii.length; j++) {
+          //    System.out.println(ascii[j]);
+          //}
+          //System.out.println("\nInteger Values:");
+          for(int j = 0; j < ascii.length; j++) {
+              int index = Integer.parseInt(ascii[j], 2);
+              //System.out.print("Int number: " + index);
+              //System.out.println("\t\tBase 64: " + dictionary.charAt(index));
+              asciiData += dictionary.charAt(index);
+          }
+  		}
+  		armouredBArray = asciiData.getBytes();
+  		
+  		return armouredBArray;
+  		
+  	}
+	
+	public  byte[] asciiDecode(byte[] bArray){
+    	
+
+		  byte[] decoded = Base64.getDecoder().decode(bArray);
+		  //System.out.println(new String(decoded));
+		
+		  String asciiData = new String(decoded);
+		
+
+        char cur;
+        int base64Val;
+        String finalBinaryString = "";
+        
+        
+         String dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwqyx0123456789+/";
+	       
+        for(int i = 0; i < asciiData.length(); i++){
+      	  
+            cur = asciiData.charAt(i);
+            
+            base64Val = dictionary.indexOf(cur);
+            
+            String binaryString = Integer.toBinaryString(base64Val);
+            
+            while (binaryString.length() < 6)
+          	  binaryString = "0" + binaryString;
+            
+            finalBinaryString += binaryString;
+            
+            
+        }
+        //System.out.println(finalBinaryString);
+        bArray = new BigInteger(finalBinaryString, 2).toByteArray();
+        
+        return bArray;
+	}
+	
+	public byte[] myAsciiEncode(byte[] bArray){
+		return Base64.getEncoder().encode(bArray);
+	}
+	
+	public byte[] myAsciiDecoder(byte[] bArray){
+		return Base64.getDecoder().decode(bArray);
+	}
+	
 }
   	//TODO: (in no particular order)
   	//1. Send packet size to receiver before sending packets. Don't rely on receiver to hardcode correct packet size.
