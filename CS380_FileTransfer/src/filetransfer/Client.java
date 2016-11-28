@@ -348,11 +348,14 @@ public class Client {
     {
         byte[] c= new byte[a.length];
         byte[] b= keyBytes;
-        int eof= 3 ;// packetSize*packetNumber;        
+        int eof= keyBytes.length;
+        int j=packetSize*packetNumber;
 
         for(int i=0;i<a.length;i++)
         {
-            c[i] = (byte) (a[i] ^ b[i%eof]);
+        	if(j>=eof)
+        		j=j%eof;
+            c[i] = (byte) (a[i] ^ b[j]);
         }
 
         return c;
