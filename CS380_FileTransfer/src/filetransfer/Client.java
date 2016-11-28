@@ -16,7 +16,7 @@ public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
-	private String keyFilePath = "E:/Documents/SocketTesting/FileClient1/keyfile.txt";
+	private String keyFilePath;
 	private int packetSize;					// packet size in bytes
 	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
 	private byte[] keyBytes;
