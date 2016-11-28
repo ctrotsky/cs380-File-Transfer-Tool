@@ -136,7 +136,7 @@ public class Client {
 				System.out.println("Received packet #" + i);
 				byte[] checksum = receiveNextChecksum(fr);
 				
-				receivedPacket= asciiDecode(receivedPacket);
+				//receivedPacket= asciiDecode(receivedPacket);
 				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
 				checksum = XoR(checksum, i);			//decrypt checksum
 				
@@ -175,7 +175,7 @@ public class Client {
 				i++;
 			}	
 			
-				packet= asciiEncode2(packet);			
+				//packet= asciiEncode2(packet);			
 			sendPacket(fs, packet);		
 			sendChecksum(fs, checksum);
 
