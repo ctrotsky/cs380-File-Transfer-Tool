@@ -1,6 +1,7 @@
 package filetransfer;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -23,7 +24,8 @@ public class Client {
 		socketPort = 13267;		// can change to whatever
 		targetIP = "127.0.0.1"; // localhost
 		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
-		packetSize = 3;			// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
+		packetSize = 3;	
+		keyFilePath="";// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
 	}
   	
   	public void receiveFile(){
@@ -313,6 +315,40 @@ public class Client {
   		System.out.println("=================");
   	}
   	
+  	private byte[] XoR(byte[] a, byte[] b)
+    {
+        byte[] c=new byte[a.length];
+        int count= b.length;
+        int j=0;
+
+        for(int i=0;i<a.length;i++)
+        {
+            if(j==count)
+                j=0;
+
+            c[i] = (byte) (a[i] ^ b[j]);
+
+
+            j++;
+        }
+
+
+      return c;
+
+    }
+  	
+	  	private byte[] key(String fn)
+	  	{
+	  		KeyFile kf= new KeyFile(fn);
+	  		byte[] kbyte= new byte[(int) kf.getFile().length()];
+	  		
+	  		kf.getFis().read(kbyte);
+	  	
+	  		kf.close();
+	  		
+	  		return kbyte;
+	  	}
+  	}
   	//TODO: (in no particular order)
   	//1. Send packet size to receiver before sending packets. Don't rely on receiver to hardcode correct packet size.
   	//2. XOR encrypt sent packets with key file
