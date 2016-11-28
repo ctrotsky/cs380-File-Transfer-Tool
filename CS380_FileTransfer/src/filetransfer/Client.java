@@ -29,7 +29,7 @@ public class Client {
 		socketPort = 13267;		// can change to whatever
 		targetIP = "127.0.0.1"; // localhost
 		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
-		packetSize = 3;	
+		packetSize = 50000;	
 		keyFilePath="";// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
 		asciiArmor = false;
 	}
@@ -140,13 +140,13 @@ public class Client {
 				byte[] checksum = receiveNextChecksum(fr);
 							
 				if (asciiArmor){
-					System.out.println("PACKET RECEIVED ASCII:");
-					printByteArray(receivedPacket);
+					//System.out.println("PACKET RECEIVED ASCII:");
+					//printByteArray(receivedPacket);
 					
 					receivedPacket = myAsciiDecode(receivedPacket);
 					
-					System.out.println("PACKET RECEIVED normal:");
-					printByteArray(receivedPacket);
+					//System.out.println("PACKET RECEIVED normal:");
+				//	printByteArray(receivedPacket);
 				}
 				
 				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
@@ -192,13 +192,13 @@ public class Client {
 //				System.out.println("PACKET BEFORE ASCII (Send):");
 //				printByteArray(packet);
 				
-				System.out.println("Default Encode:");
-				printByteArray(Base64.getEncoder().encode(packet));
+				//System.out.println("Default Encode:");
+				//printByteArray(Base64.getEncoder().encode(packet));
 				
 				packet= myAsciiEncode(packet);
 				
-				System.out.println("PACKET AFTER ASCII (Send):");
-				printByteArray(packet);
+				//System.out.println("PACKET AFTER ASCII (Send):");
+				//printByteArray(packet);
 			}
 						
 			sendInt(fs, packet.length);
