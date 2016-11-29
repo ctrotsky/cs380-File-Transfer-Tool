@@ -4,6 +4,16 @@ public class ThreadRunner implements Runnable {
 	
 	Client myClient = new Client();
 	boolean sendMode = true;
+	String username;
+	String password;
+	
+	public ThreadRunner(){
+		
+	}
+	
+	public ThreadRunner(Client c){
+		myClient = c;
+	}
 
 	public void setFilePath(String filePath){
 		myClient.setFilePath(filePath);
@@ -36,12 +46,23 @@ public class ThreadRunner implements Runnable {
   	public void setAsciiArmored(boolean asciiArmor){
   		myClient.setAsciiArmored(asciiArmor);
   	}
-	
+  	
+  	public void setAuthenticationFilePath(String filePath){
+  		myClient.setAuthenticationFilePath(filePath);
+  	}
+  	
+  	public void setUsername(String username){
+  		this.username = username;
+  	}
+  	
+  	public void setPassword(String password){
+  		this.password = password;
+  	}
 	
 	@Override
 	public void run() {
 		if (sendMode){
-			myClient.sendFile();
+			myClient.sendFile(username, password);
 		}
 		else{
 			myClient.receiveFile();

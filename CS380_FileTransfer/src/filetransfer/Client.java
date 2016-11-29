@@ -2,6 +2,7 @@ package filetransfer;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,59 +11,111 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
+import java.util.Scanner;
 
 public class Client {
 	private int socketPort;					// port to connect to
 	private String targetIP;				// IP to connect to
 	private String filePath;				// path to file to send/receive
 	private String keyFilePath;
+	private String authenticationFilePath;
 	private int packetSize;					// packet size in bytes
-	private static final int TIMEOUT_TIME = 50000;	//time until timeout in milliseconds
+	private static final int TIMEOUT_TIME = 5000;	//time until timeout in milliseconds
 	private byte[] keyBytes;
 	private boolean asciiArmor;
+	private HashMap<String,String> authenticationInfo;
+	private int retryAttempts;
+	
 	
 	//default values for these are mostly meaningless. Set values later in Driver with setter methods. can change to initialize with parameters in constructor if you want.
 	public Client(){
 		socketPort = 13267;		// can change to whatever
 		targetIP = "127.0.0.1"; // localhost
 		filePath = "E:/Documents/SocketTesting/FileClient1/SendFile.txt";	// file to send or receive
-		packetSize = 50000;	
+		packetSize = 5000;	
 		keyFilePath="";// only send 3 bytes by default cause test file is tiny. should be much bigger for real file.
 		asciiArmor = false;
+		retryAttempts = 5;
 	}
   	
   	public void receiveFile(){
-  		
   	    Socket sock = null;
   	    FileReceiver fr = null;
   	    
   	    OutputStream responseOs = null;
   	    
+  	    System.out.println("[RECV] Waiting to connect to receive...");
+  	    
   	    try {
   	    	readKeyBytes(keyFilePath);
+  	    	readAuthenticationFile(authenticationFilePath);
+  	    	System.out.println("Targetip: " + targetIP);
+  	    	System.out.println("socketPort: " + socketPort);
 	    	sock = new Socket(targetIP, socketPort);
 	    	fr = new FileReceiver(filePath, sock);
 	    	responseOs = sock.getOutputStream();
 	    	
+	    	System.out.println("[RECV] Connected to receive!");
+	    	
 	    	//TODO: validate username/password here
-	    	int numPackets = receiveInt(fr);	//receive the number of packets to expect
-	    	System.out.println("Num of packets to expect:" +  numPackets);
-	    	receiveAllPackets(fr, responseOs, numPackets);
-	    	terminateReceivingConnection(sock, fr, responseOs);
+	    	
+	    	String receivedUsername = receiveString(fr);
+	    	String receivedPassword = receiveString(fr);
+	    	if (checkAuthentication(receivedUsername, receivedPassword)){
+	    		System.out.println("[RECV] Authenticated successfully... Receiving file.");
+	    		sendResponseSignal(responseOs, true);
+	    		
+		    	int numPackets = receiveInt(fr);	//receive the number of packets to expect
+		    	System.out.println("[RECV] Num of packets to expect:" +  numPackets);
+		    	receiveAllPackets(fr, responseOs, numPackets);
+		    	terminateReceivingConnection(sock, fr, responseOs);
+	    	}
+	    	else {
+	    		System.out.println("[RECV] Authentication failed. Username or password incorrect.");
+	    		sendResponseSignal(responseOs, false);
+	    	}
   	  	}
   	    catch (IOException e) {
 			System.err.println("IOException: " + e.getMessage());
+			e.printStackTrace();
 		}
 	    catch (InterruptedException e) {
 			System.err.println("InterruptedException: " + e.getMessage());
+			e.printStackTrace();
 		}
   	}
   	
+  	private boolean checkAuthentication(String receivedUsername, String receivedPassword){
+  		System.out.println("[RECV] User: " + receivedUsername + " is requesting transfer");
+  		System.out.println("[RECV] Received pass: " + receivedPassword);
+  		
+  		if (authenticationInfo.containsKey(receivedUsername) && authenticationInfo.get(receivedUsername).equals(receivedPassword)){
+  			return true;
+  		}
+  		return false;
+  	}
+  	
+  	private void readAuthenticationFile(String filepath) throws FileNotFoundException{
+  		Scanner read = new Scanner(new File(filepath));
+  		read.useDelimiter(",");
+  		authenticationInfo = new HashMap<String, String>();
+  		
+  		while (read.hasNext()){
+  			String username = read.next();
+  			String password = read.next();
+  			authenticationInfo.put(username, password);
+  		}
+  		read.close();
+  	}
+  	
   	//sends the file to the connected client.
-  	public void sendFile(){
+  	public void sendFile(String username, String password){
   	    ServerSocket servsock = null;
   	    Socket sock = null;
   	    FileSender fs = null;
@@ -76,99 +129,119 @@ public class Client {
   			responseIs = sock.getInputStream();
   			
   			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
-  			System.out.println("File Size: " + fs.getFile().length());
-  			System.out.println("Number of packets: " + numPackets);
+  			System.out.println("[SEND] File Size: " + fs.getFile().length());
+  			System.out.println("[SEND] Number of packets: " + numPackets);
   			
-  			//TODO: validate username/password here
+  			//send username and password to receiver
+  			sendString(fs, username);
+  			sendString(fs, password);
   			
-  			sendInt(fs, numPackets);	//tell receiver how many packets to expect
-  			sendAllPackets(fs, responseIs, numPackets);
-  			terminateSendingConnection(servsock, sock, fs, responseIs);
-  			
+  			//receiver will send responseSignal = true if authenticated correctly
+  			boolean authenticated = checkResponseSignal(responseIs);
+  			if (authenticated){
+  				System.out.println("[SEND] Authenticated successfully... Sending file.");
+  				//do file sending shit
+	  			sendInt(fs, numPackets);	//tell receiver how many packets to expect
+	  			sendAllPackets(fs, responseIs, numPackets);
+  			}
+  			else {
+  				System.out.println("[SEND] Authentication failed. Username or password incorrect.");
+  			}
+  			terminateSendingConnection(servsock, sock, fs, responseIs);  			
   	    }
   		catch (IOException e) {
   			System.err.println("IOException: " + e.getMessage());
+  			e.printStackTrace();
   		}
   	    catch (InterruptedException e) {
 			System.err.println("InterruptedException: " + e.getMessage());
+			e.printStackTrace();
 		}
   	}	
   	
   	//Establishes connection. Returns Socket that is connected.
   	private Socket establishConnection(ServerSocket servsock, int port) throws IOException{
   		Socket sock;
-  		System.out.println("Waiting for connection...");
+  		System.out.println("[SEND] Waiting for connection to send...");
   		servsock = new ServerSocket(port);
   		sock = servsock.accept();
-		System.out.println("Accepted connection: " + sock);
+		System.out.println("[SEND] Connected to send!: " + sock);
 		servsock.close();
 		return sock;
   	}
   	
   	//Terminates connection by closing all streams.
   	private void terminateSendingConnection(ServerSocket servsock, Socket sock, Closeable filehandler, Closeable responseStream) throws IOException{
-  			if (servsock != null) servsock.close();
-	    	if (filehandler != null) filehandler.close();
-			if (sock!=null) sock.close();
-			if (responseStream != null) responseStream.close();
+  		System.out.println("[SEND] Terminating sending connection...");
+		if (servsock != null) servsock.close();
+    	if (filehandler != null) filehandler.close();
+		if (sock!=null) sock.close();
+		if (responseStream != null) responseStream.close();
   	}
   	
   	//Terminates connection by closing all streams.
   	private void terminateReceivingConnection(Socket sock, Closeable filehandler, Closeable responseStream) throws IOException{
-	    	if (filehandler != null) filehandler.close();
-			if (sock!=null) sock.close();
-			if (responseStream != null) responseStream.close();
+  		System.out.println("[RECV] Terminating receiving connection...");
+  		if (filehandler != null) filehandler.close();
+		if (sock!=null) sock.close();
+		if (responseStream != null) responseStream.close();
   	}
   	
   	
-  	private void receiveAllPackets(FileReceiver fr, OutputStream responseOs, int numPackets) throws IOException, InterruptedException{
+  	private boolean receiveAllPackets(FileReceiver fr, OutputStream responseOs, int numPackets) throws IOException, InterruptedException{
   		//loop through receiving packets
   		byte[] receivedPacket;
+  		int remainingAttempts = retryAttempts;
   		
 		int i = 0;
 		while (i < numPackets){
 			boolean timedOut = waitForAvailable(fr.getIs(), TIMEOUT_TIME, packetSize);	//wait for full packet to arrive and be available
 			if (timedOut == true){
-				System.out.println("Did not receive full packet. Timed out");
+				System.out.println("[RECV] Did not receive full packet. Timed out");
 			}
 			
 			int nextPacketSize = receiveInt(fr);
 			receivedPacket = receiveNextPacket(fr, nextPacketSize);		
 			
 			if (receivedPacket != null){
-				System.out.println("Received packet #" + i);
+				System.out.println("[RECV] Received packet #" + i);
 				byte[] checksum = receiveNextChecksum(fr);
 							
-				if (asciiArmor){
-					//System.out.println("PACKET RECEIVED ASCII:");
-					//printByteArray(receivedPacket);
-					
+				if (asciiArmor){				
 					receivedPacket = myAsciiDecode(receivedPacket);
-					
-					//System.out.println("PACKET RECEIVED normal:");
-				//	printByteArray(receivedPacket);
 				}
 				
 				receivedPacket = XoR(receivedPacket,i);	//decrypt packet
 				checksum = XoR(checksum, i);			//decrypt checksum
 				
 				if (checkIntegrity(receivedPacket, checksum) && !timedOut){
-					System.out.println("Packet has integrity");
+					System.out.println("[RECV] Packet has integrity");
 					i++;
+					remainingAttempts = remainingAttempts;
 					//TODO: decrypt packet here
 					writePacketToFile(fr, receivedPacket, packetSize);
 					sendResponseSignal(responseOs, true);		//let sender know packet was successfully received
 				}
 				else{
-					System.out.println("Packet needs to be resent");
-					sendResponseSignal(responseOs, false);	//let sender know packet was not correct, need to resend packet
+					System.out.println("[RECV] Problem with transmission.");
+					if (remainingAttempts > 0){
+						remainingAttempts--;
+						System.out.println("[RECV] Signaling sender to try again.");
+						System.out.println("[RECV] Remaining attempts: " + remainingAttempts);
+						sendResponseSignal(responseOs, false);	//let sender know packet was not correct, need to resend packet	
+					}
+					else {
+						System.out.println("[RECV] Out of attempts. Quitting receiving.");
+						return false;
+					}		
 				}
 			}
 		}
-		System.out.println("Finished receiving file");
+		System.out.println("[RECV] Finished receiving file");
+		return true;
   	}
   	
-  	private void sendAllPackets(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
+  	private boolean sendAllPackets(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
   		boolean moveToNextPacket = true;
 		boolean timedOut = false;
 		boolean successfulReceive;
@@ -177,14 +250,16 @@ public class Client {
 		
 		//loop through sending each packet
 		int i = 0;
+		int remainingAttempts = retryAttempts;
 		while (i < numPackets){
-			System.out.println("Sending packet #" + i);
+			System.out.println("[SEND] Sending packet #" + i);
 			if (moveToNextPacket){	
 				packet = prepareNextPacket(fs);
 				checksum = checksumPacketBytes(packet);
 				packet=XoR(packet,i); //encrypt packet
 				checksum=XoR(checksum,i); //encrypt checksum
 				i++;
+				remainingAttempts = retryAttempts;
 			}		
 			
 			if (asciiArmor){
@@ -192,30 +267,38 @@ public class Client {
 //				System.out.println("PACKET BEFORE ASCII (Send):");
 //				printByteArray(packet);
 				
-				//System.out.println("Default Encode:");
-				//printByteArray(Base64.getEncoder().encode(packet));
+//				System.out.println("Default Encode:");
+//				printByteArray(Base64.getEncoder().encode(packet));
 				
 				packet= myAsciiEncode(packet);
 				
-				//System.out.println("PACKET AFTER ASCII (Send):");
-				//printByteArray(packet);
+//				System.out.println("PACKET AFTER ASCII (Send):");
+//				printByteArray(packet);
 			}
 						
 			sendInt(fs, packet.length);
-			sendPacket(fs, packet);		
+			sendPacket(fs, packet);
 			sendChecksum(fs, checksum);
-
 			
 			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
-			successfulReceive = checkResponseSignal(responseIs);				//resolve that byte to a boolean
+			successfulReceive = checkResponseSignal(responseIs);		//resolve that byte to a boolean
 			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
 				moveToNextPacket = true;
 			}
 			else {
-				System.out.println("last packet not received correctly, retrying");
-				moveToNextPacket = false;
+				System.out.println("[SEND] Last packet not received correctly...");
+				if (remainingAttempts > 0){
+					moveToNextPacket = false;
+					remainingAttempts--;
+					System.out.println("[SEND] Remaining Attempts: " + remainingAttempts);
+				}
+				else {
+					System.out.println("[SEND] Out of attempts. Quitting sending.");
+					return false;
+				}
 			}
 		}
+		return true;
   	}
   	
   	
@@ -304,21 +387,41 @@ public class Client {
 		fs.getOs().flush();	
   	}
   	
-  	//sends the number of packets from the sender to the receiver
+  	//sends an integer to the receiver
   	private void sendInt(FileSender fs, int numPackets) throws IOException{	
-  		byte[] numPacketsBytes = ByteBuffer.allocate(4).putInt(numPackets).array();	
+  		byte[] intBytes = ByteBuffer.allocate(4).putInt(numPackets).array();	
   		
-  		fs.getOs().write(numPacketsBytes,0,numPacketsBytes.length);
+  		fs.getOs().write(intBytes,0,intBytes.length);
 		fs.getOs().flush();
   	}
   	
-  	//receives byte array of number of packets and returns int
+  	//receives byte array of int and returns int
   	private int receiveInt(FileReceiver fr) throws IOException{	
-  		byte [] numPacketsBytes  = new byte [4];
+  		byte [] intBytes  = new byte [4];
   	
-  		fr.getIs().read(numPacketsBytes);
+  		fr.getIs().read(intBytes);
 
-  		return (ByteBuffer.wrap(numPacketsBytes).getInt());
+  		return (ByteBuffer.wrap(intBytes).getInt());
+  	}
+  	
+  	//sends a string to the receiver
+  	private void sendString(FileSender fs, String string) throws IOException{	
+  		System.out.println("[SEND] Sending string: " + string);
+  		byte[] stringBytes = string.getBytes();
+  		
+  		sendInt(fs, stringBytes.length);					//tell receiver how many bytes to expect
+  		fs.getOs().write(stringBytes,0,stringBytes.length);	//send the string
+		fs.getOs().flush();
+  	}
+  	
+  	//receives bytes of string and returns that string
+  	private String receiveString(FileReceiver fr) throws IOException{	
+  		byte [] stringBytes  = new byte [receiveInt(fr)];	//receive how many bytes string will be
+  	
+  		fr.getIs().read(stringBytes);
+
+  		String result = new String(stringBytes, Charset.forName("UTF-8"));
+  		return result;
   	}
   	
   	
@@ -360,12 +463,20 @@ public class Client {
   		keyFilePath = filePath;
   	}
   	
+  	public void setAuthenticationFilePath(String filePath){
+  		this.authenticationFilePath = filePath;
+  	}
+  	
   	public void setPacketSize(int packetSize){
   		this.packetSize = packetSize;
   	}
   	
   	public void setAsciiArmored(boolean asciiArmor){
   		this.asciiArmor = asciiArmor;
+  	}
+  	
+  	public void setRetryAttempts(int retryAttempts){
+  		this.retryAttempts = retryAttempts;
   	}
   	
   	
@@ -392,6 +503,7 @@ public class Client {
         		j=j%eof;
         	
             c[i] = (byte) (a[i] ^ b[j]);
+            j++;
         }
 
         return c;
