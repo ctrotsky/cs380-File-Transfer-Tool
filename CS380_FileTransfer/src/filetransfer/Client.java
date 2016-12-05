@@ -158,7 +158,7 @@ public class Client {
 			e.printStackTrace();
 		}
   	}	
-  	
+  	 	
   	//Establishes connection. Returns Socket that is connected.
   	private Socket establishConnection(ServerSocket servsock, int port) throws IOException{
   		Socket sock;
@@ -252,28 +252,21 @@ public class Client {
 		int i = 0;
 		int remainingAttempts = retryAttempts;
 		while (i < numPackets){
-			System.out.println("[SEND] Sending packet #" + i);
 			if (moveToNextPacket){	
+				System.out.println("[SEND] Sending packet #" + i);
 				packet = prepareNextPacket(fs);
 				checksum = checksumPacketBytes(packet);
 				packet=XoR(packet,i); //encrypt packet
 				checksum=XoR(checksum,i); //encrypt checksum
 				i++;
 				remainingAttempts = retryAttempts;
-			}		
+			}	
+			else {
+				System.out.println("[SEND] Retrying sending packet #" + (i - 1));
+			}
 			
 			if (asciiArmor){
-				
-//				System.out.println("PACKET BEFORE ASCII (Send):");
-//				printByteArray(packet);
-				
-//				System.out.println("Default Encode:");
-//				printByteArray(Base64.getEncoder().encode(packet));
-				
 				packet= myAsciiEncode(packet);
-				
-//				System.out.println("PACKET AFTER ASCII (Send):");
-//				printByteArray(packet);
 			}
 						
 			sendInt(fs, packet.length);
@@ -628,6 +621,123 @@ public class Client {
 	public byte[] myAsciiDecode(byte[] bArray){
 		return Base64.getDecoder().decode(bArray);
 	}
+	
+	
+	
+	
+	//============================================================================
+	//TEST CASES BELOW
+	//============================================================================
+	
+	
+	public void sendFileWithError(String username, String password){
+  	    ServerSocket servsock = null;
+  	    Socket sock = null;
+  	    FileSender fs = null;
+  	    
+  	    InputStream responseIs = null;
+  	    
+  	    try {
+  	    	readKeyBytes(keyFilePath);
+  	    	sock = establishConnection(servsock, socketPort);
+  	    	fs = new FileSender(filePath, sock);
+  			responseIs = sock.getInputStream();
+  			
+  			int numPackets = (int) Math.ceil(((int) fs.getFile().length())/packetSize) + 1;
+  			System.out.println("[SEND] File Size: " + fs.getFile().length());
+  			System.out.println("[SEND] Number of packets: " + numPackets);
+  			
+  			//send username and password to receiver
+  			sendString(fs, username);
+  			sendString(fs, password);
+  			
+  			//receiver will send responseSignal = true if authenticated correctly
+  			boolean authenticated = checkResponseSignal(responseIs);
+  			if (authenticated){
+  				System.out.println("[SEND] Authenticated successfully... Sending file.");
+  				//do file sending shit
+	  			sendInt(fs, numPackets);	//tell receiver how many packets to expect
+	  			sendAllPacketsWithError(fs, responseIs, numPackets);
+  			}
+  			else {
+  				System.out.println("[SEND] Authentication failed. Username or password incorrect.");
+  			}
+  			terminateSendingConnection(servsock, sock, fs, responseIs);  			
+  	    }
+  		catch (IOException e) {
+  			System.err.println("IOException: " + e.getMessage());
+  			e.printStackTrace();
+  		}
+  	    catch (InterruptedException e) {
+			System.err.println("InterruptedException: " + e.getMessage());
+			e.printStackTrace();
+		}
+  	}	
+	
+	
+	
+	private boolean sendAllPacketsWithError(FileSender fs, InputStream responseIs, int numPackets) throws IOException, InterruptedException{
+  		boolean moveToNextPacket = true;
+		boolean timedOut = false;
+		boolean successfulReceive;
+		byte[] packet = null;
+		byte[] checksum = null;
+		
+		//loop through sending each packet
+		int i = 0;
+		int remainingAttempts = retryAttempts;
+		while (i < numPackets){
+			if (moveToNextPacket){	
+				System.out.println("[SEND] Sending packet #" + i);
+				packet = prepareNextPacket(fs);
+				checksum = checksumPacketBytes(packet);
+				packet=XoR(packet,i); //encrypt packet
+				checksum=XoR(checksum,i); //encrypt checksum
+				i++;
+				remainingAttempts = retryAttempts;
+			}	
+			else {
+				System.out.println("[SEND] Retrying sending packet #" + (i - 1));
+			}	
+			
+			if (asciiArmor){
+				packet= myAsciiEncode(packet);
+			}
+						
+			sendInt(fs, packet.length);
+			
+			
+			if(i == 2 && remainingAttempts == retryAttempts){
+				byte[] errorPacket = Arrays.copyOf(packet, packet.length);
+				errorPacket[2] = -10;
+				sendPacket(fs, errorPacket);
+			}
+			else{
+				sendPacket(fs, packet);
+			}		
+			sendChecksum(fs, checksum);
+			
+			timedOut = waitForAvailable(responseIs, TIMEOUT_TIME, 1);	//wait until 1 byte arrives (signal that last packet was successful)
+			successfulReceive = checkResponseSignal(responseIs);		//resolve that byte to a boolean
+			if (successfulReceive && !timedOut){						//if packet was received successfully and signal did not time out, send next packet. Otherwise send same packet again.
+				moveToNextPacket = true;
+			}
+			else {
+				System.out.println("[SEND] Last packet not received correctly...");
+				if (remainingAttempts > 0){
+					moveToNextPacket = false;
+					remainingAttempts--;
+					System.out.println("[SEND] Remaining Attempts: " + remainingAttempts);
+				}
+				else {
+					System.out.println("[SEND] Out of attempts. Quitting sending.");
+					return false;
+				}
+			}
+		}
+		return true;
+  	}
+	
 	
 }
   	//TODO: (in no particular order)

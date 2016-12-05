@@ -62,7 +62,7 @@ public class ThreadRunner implements Runnable {
 	@Override
 	public void run() {
 		if (sendMode){
-			myClient.sendFile(username, password);
+			myClient.sendFileWithError(username, password);
 		}
 		else{
 			myClient.receiveFile();
